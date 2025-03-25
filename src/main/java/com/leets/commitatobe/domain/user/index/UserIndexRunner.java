@@ -20,7 +20,7 @@ public class UserIndexRunner implements CommandLineRunner {
 	}
 
 	@Override
-	public void run(String... args) throws Exception {
+	public void run(String... args) {
 		List<User> users = userRepository.findAll();
 		for (User user : users) {
 			UserDocument document = new UserDocument();
