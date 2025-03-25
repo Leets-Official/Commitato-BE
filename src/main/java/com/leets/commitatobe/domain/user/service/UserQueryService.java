@@ -2,6 +2,7 @@ package com.leets.commitatobe.domain.user.service;
 
 import static com.leets.commitatobe.global.response.code.status.ErrorStatus.*;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.data.domain.Page;
@@ -15,11 +16,13 @@ import com.leets.commitatobe.domain.commit.repository.CommitRepository;
 import com.leets.commitatobe.domain.login.service.LoginCommandService;
 import com.leets.commitatobe.domain.tier.domain.Tier;
 import com.leets.commitatobe.domain.user.domain.User;
+import com.leets.commitatobe.domain.user.domain.UserDocument;
 import com.leets.commitatobe.domain.user.dto.response.UserCommitResponse;
 import com.leets.commitatobe.domain.user.dto.response.UserInfoResponse;
 import com.leets.commitatobe.domain.user.dto.response.UserRankResponse;
 import com.leets.commitatobe.domain.user.dto.response.UserSearchResponse;
 import com.leets.commitatobe.domain.user.repository.UserRepository;
+import com.leets.commitatobe.domain.user.repository.UserSearchRepository;
 import com.leets.commitatobe.global.exception.ApiException;
 import com.leets.commitatobe.global.response.CustomPageResponse;
 
@@ -32,10 +35,26 @@ public class UserQueryService {
 	private final UserRepository userRepository;
 	private final CommitRepository commitRepository;
 	private final LoginCommandService loginCommandService;
+	private final UserSearchRepository userSearchRepository;
 
 	private User getUser(String githubId) {
 		return userRepository.findByGithubId(githubId)
 			.orElseThrow(() -> new ApiException(_USER_NOT_FOUND));
+	}
+
+	@Transactional
+	public void indexUsers() {
+		List<User> users = userRepository.findAll();
+		List<UserDocument> docs = new ArrayList<>();
+		for (User user : users) {
+			UserDocument document = new UserDocument();
+			document.setId(user.getId().toString());
+			document.setGithubId(user.getGithubId());
+			document.setUsername(user.getUsername());
+			// 다른 필요한 필드도 여기서 매핑 가능
+			docs.add(document);
+		}
+		userSearchRepository.saveAll(docs);
 	}
 
 	@Transactional
@@ -50,6 +69,11 @@ public class UserQueryService {
 			user.getExp(),
 			user.getConsecutiveCommitDays()
 		);
+	}
+
+	public List<UserDocument> searchUsers(String githubId){
+		indexUsers();
+		return userSearchRepository.findByGithubIdContaining(githubId);
 	}
 
 	public CustomPageResponse<UserRankResponse> getUsersOrderByExp(int page, int size) {//경험치 순으로 페이징된 유저 정보 조회

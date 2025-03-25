@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.leets.commitatobe.domain.login.service.LoginQueryService;
+import com.leets.commitatobe.domain.user.domain.UserDocument;
 import com.leets.commitatobe.domain.user.dto.response.UserCommitResponse;
 import com.leets.commitatobe.domain.user.dto.response.UserInfoResponse;
 import com.leets.commitatobe.domain.user.dto.response.UserRankResponse;
@@ -34,6 +35,11 @@ public class UserController {
 	@GetMapping("/search/{githubId}")
 	public ApiResponse<UserSearchResponse> searchUsers(@PathVariable("githubId") String githubId) {
 		return ApiResponse.onSuccess(userQueryService.searchUsersByGithubId(githubId));
+	}
+
+	@GetMapping("/elastic/{githubId}")
+	public ApiResponse<List<UserDocument>> searchUser(@PathVariable("githubId") String githubId){
+		return ApiResponse.onSuccess(userQueryService.searchUsers(githubId));
 	}
 
 	@Operation(
