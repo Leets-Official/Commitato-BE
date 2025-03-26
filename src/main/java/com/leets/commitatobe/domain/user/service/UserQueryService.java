@@ -50,8 +50,10 @@ public class UserQueryService {
 			UserDocument document = new UserDocument();
 			document.setId(user.getId().toString());
 			document.setGithubId(user.getGithubId());
-			document.setUsername(user.getUsername());
-			// 다른 필요한 필드도 여기서 매핑 가능
+			document.setTierName(user.getTier().getTierName());
+			document.setRanking(user.getRanking());
+			document.setExp(user.getExp());
+			document.setConsecutiveCommitDays(user.getConsecutiveCommitDays());
 			docs.add(document);
 		}
 		userSearchRepository.saveAll(docs);
