@@ -47,19 +47,22 @@ public class UserQueryService {
 		List<User> users = userRepository.findAll();
 		List<UserDocument> docs = new ArrayList<>();
 		for (User user : users) {
-			UserDocument document = new UserDocument();
-			document.setId(user.getId().toString());
-			document.setGithubId(user.getGithubId());
-			document.setTierName(user.getTier().getTierName());
-			document.setRanking(user.getRanking());
-			document.setExp(user.getExp());
-			document.setConsecutiveCommitDays(user.getConsecutiveCommitDays());
-			docs.add(document);
+			UserSearchResponse response = UserSearchResponse.from(user);
+
+			UserDocument userDocument = new UserDocument(
+				response.id(),
+				response.githubId(),
+				response.tierName(),
+				response.ranking(),
+				response.exp(),
+				response.consecutiveCommitDays()
+			);
+			docs.add(userDocument);
 		}
 		userSearchRepository.saveAll(docs);
 	}
 
-	@Transactional
+	/*@Transactional
 	public UserSearchResponse searchUsersByGithubId(String githubId) {// 유저 이름으로 유저 정보 검색
 		User user = getUser(githubId);
 		Tier tier = user.getTier();
@@ -71,7 +74,7 @@ public class UserQueryService {
 			user.getExp(),
 			user.getConsecutiveCommitDays()
 		);
-	}
+	}*/
 
 	public List<UserDocument> searchUsers(String githubId){
 		indexUsers();

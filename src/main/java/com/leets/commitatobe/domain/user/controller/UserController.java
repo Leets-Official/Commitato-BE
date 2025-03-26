@@ -28,14 +28,14 @@ public class UserController {
 	private final UserQueryService userQueryService;
 	private final LoginQueryService loginQueryService;
 
-	@Operation(
+	/*@Operation(
 		summary = "유저 정보 검색",
 		description = "깃허브 아이디로 검색합니다."
 	)
 	@GetMapping("/search/{githubId}")
 	public ApiResponse<UserSearchResponse> searchUsers(@PathVariable("githubId") String githubId) {
 		return ApiResponse.onSuccess(userQueryService.searchUsersByGithubId(githubId));
-	}
+	}*/
 
 	@GetMapping("/elastic/{githubId}")
 	public ApiResponse<List<UserDocument>> searchUser(@PathVariable("githubId") String githubId){
