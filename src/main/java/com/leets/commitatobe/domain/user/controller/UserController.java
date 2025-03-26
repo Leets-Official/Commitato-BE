@@ -13,7 +13,6 @@ import com.leets.commitatobe.domain.user.domain.UserDocument;
 import com.leets.commitatobe.domain.user.dto.response.UserCommitResponse;
 import com.leets.commitatobe.domain.user.dto.response.UserInfoResponse;
 import com.leets.commitatobe.domain.user.dto.response.UserRankResponse;
-import com.leets.commitatobe.domain.user.dto.response.UserSearchResponse;
 import com.leets.commitatobe.domain.user.service.UserQueryService;
 import com.leets.commitatobe.global.response.ApiResponse;
 import com.leets.commitatobe.global.response.CustomPageResponse;
