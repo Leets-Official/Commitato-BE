@@ -62,21 +62,7 @@ public class UserQueryService {
 		userSearchRepository.saveAll(docs);
 	}
 
-	/*@Transactional
-	public UserSearchResponse searchUsersByGithubId(String githubId) {// 유저 이름으로 유저 정보 검색
-		User user = getUser(githubId);
-		Tier tier = user.getTier();
-
-		return new UserSearchResponse(
-			user.getRanking(),
-			user.getGithubId(),
-			tier.getTierName(),
-			user.getExp(),
-			user.getConsecutiveCommitDays()
-		);
-	}*/
-
-	public List<UserDocument> searchUsers(String githubId){
+	public List<UserDocument> searchUsers(String githubId) {
 		indexUsers();
 		return userSearchRepository.findByGithubIdContaining(githubId);
 	}
