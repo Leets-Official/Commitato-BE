@@ -1,8 +1,8 @@
 spring:
   elasticsearch:
     uris: https://localhost:9200
-    username: elastic
-    password: mPYeCTOPMoAxiWi8bl7a
+    username: ${ES_USER}
+    password: ${ES_PASSWORD}
   application:
     name: commitato-BE
 
