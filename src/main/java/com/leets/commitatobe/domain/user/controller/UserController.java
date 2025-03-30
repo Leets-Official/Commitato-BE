@@ -27,7 +27,7 @@ public class UserController {
 	private final UserQueryService userQueryService;
 	private final LoginQueryService loginQueryService;
 
-	@GetMapping("/elastic/{githubId}")
+	@GetMapping("/search/{githubId}")
 	public ApiResponse<List<UserDocument>> searchUser(@PathVariable("githubId") String githubId) {
 		return ApiResponse.onSuccess(userQueryService.searchUsers(githubId));
 	}
