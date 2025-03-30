@@ -27,6 +27,10 @@ public class UserController {
 	private final UserQueryService userQueryService;
 	private final LoginQueryService loginQueryService;
 
+	@Operation(
+		summary = "사용자 검색",
+		description = "사용자 id 또는 그 일부 검색을 통한 사용자를 검색합니다."
+	)
 	@GetMapping("/search/{githubId}")
 	public ApiResponse<List<UserDocument>> searchUser(@PathVariable("githubId") String githubId) {
 		return ApiResponse.onSuccess(userQueryService.searchUsers(githubId));
