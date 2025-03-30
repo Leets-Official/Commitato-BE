@@ -42,6 +42,7 @@ public class UserQueryService {
 			.orElseThrow(() -> new ApiException(_USER_NOT_FOUND));
 	}
 
+	//mysql과 엘라스틱 서치를 인덱싱하여 엘라스틱서치를 통해 정보가 업데이트 되도록 진행.
 	@Transactional
 	public void indexUsers() {
 		List<User> users = userRepository.findAll();
