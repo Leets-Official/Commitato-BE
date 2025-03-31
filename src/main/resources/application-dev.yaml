@@ -59,3 +59,5 @@ management:
       application: ${spring.application.name}
 
 server-uri: ENC(9uSGkzaRV41gMgfy74TVxkbrDYtD0CuIDFSRJuQba14hudMDsWXVhw==)
+
+hostname: ENC(5H01n5YFZSpX7RchqwfV1yMJ4aRIhyXg)
