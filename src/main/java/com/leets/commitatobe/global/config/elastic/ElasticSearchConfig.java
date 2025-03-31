@@ -26,6 +26,9 @@ public class ElasticSearchConfig {
 	@Value("${spring.elasticsearch.password}")
 	private String password;
 
+	@Value("${hostname}")
+	private String hostname;
+
 	@Bean
 	public ElasticsearchClient elasticSearchClient() {
 		SSLContext sslContext;
@@ -41,7 +44,7 @@ public class ElasticSearchConfig {
 		credentialsProvider.setCredentials(AuthScope.ANY, new UsernamePasswordCredentials(username, password));
 
 		RestClient restClient = RestClient.builder(
-				new HttpHost("localhost", 9200, "https"))
+				new HttpHost(hostname, 9200, "https"))
 			.setHttpClientConfigCallback(httpClientBuilder ->
 				httpClientBuilder.setSSLContext(sslContext)
 					.setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
