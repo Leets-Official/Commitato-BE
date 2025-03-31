@@ -9,10 +9,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.leets.commitatobe.domain.login.service.LoginQueryService;
+import com.leets.commitatobe.domain.user.domain.UserDocument;
 import com.leets.commitatobe.domain.user.dto.response.UserCommitResponse;
 import com.leets.commitatobe.domain.user.dto.response.UserInfoResponse;
 import com.leets.commitatobe.domain.user.dto.response.UserRankResponse;
-import com.leets.commitatobe.domain.user.dto.response.UserSearchResponse;
 import com.leets.commitatobe.domain.user.service.UserQueryService;
 import com.leets.commitatobe.global.response.ApiResponse;
 import com.leets.commitatobe.global.response.CustomPageResponse;
@@ -28,12 +28,12 @@ public class UserController {
 	private final LoginQueryService loginQueryService;
 
 	@Operation(
-		summary = "유저 정보 검색",
-		description = "깃허브 아이디로 검색합니다."
+		summary = "사용자 검색",
+		description = "사용자 id 또는 그 일부 검색을 통한 사용자를 검색합니다."
 	)
 	@GetMapping("/search/{githubId}")
-	public ApiResponse<UserSearchResponse> searchUsers(@PathVariable("githubId") String githubId) {
-		return ApiResponse.onSuccess(userQueryService.searchUsersByGithubId(githubId));
+	public ApiResponse<List<UserDocument>> searchUser(@PathVariable("githubId") String githubId) {
+		return ApiResponse.onSuccess(userQueryService.searchUsers(githubId));
 	}
 
 	@Operation(

@@ -1,4 +1,8 @@
 spring:
+  elasticsearch:
+    uris: https://localhost:9200
+    username: ${ES_USER}
+    password: ${ES_PASSWORD}
   application:
     name: commitato-BE
 
@@ -11,7 +15,7 @@ spring:
   jpa:
     show-sql: true
     hibernate:
-      ddl-auto: create
+      ddl-auto: update
     properties:
       hibernate:
         format_sql: true
