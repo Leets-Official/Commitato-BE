@@ -50,7 +50,8 @@ public class SecurityConfig {
 			.authorizeHttpRequests((authorize) ->
 				authorize
 					.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/commit/**",
-						"/login/**", "/auth/**", "/h2-console/**", "/error/**", actuatorEndPoint + "/**").permitAll()
+						"/login/**", "/auth/**", "/h2-console/**", "/error/**", actuatorEndPoint + "/**",
+						"/user/ranking").permitAll()
 					.anyRequest().authenticated()
 			)
 			.headers(headers -> headers
