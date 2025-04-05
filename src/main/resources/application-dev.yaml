@@ -1,8 +1,6 @@
 spring:
   elasticsearch:
-    uris: ENC(vCq/Pi+4NJNk4T8LEj3TIh6y9qWOfUaIy0X5uw8TlHvgZ6acP73xvA==)
-    username: ENC(+9CIeQ6TE+PYzeZegK9etg==)
-    password: ENC(M1dikxwEY3KyLOq/TyYphDmGflvs4+Ud)
+    uris: ENC(Tih31B4mNPq4id5pcOw5GB0IqNlajDwiwLE4IGP5sPAnD4NzdqhZJw==)
   application:
     name: commitato-BE
 
@@ -60,4 +58,4 @@ management:
 
 server-uri: ENC(9uSGkzaRV41gMgfy74TVxkbrDYtD0CuIDFSRJuQba14hudMDsWXVhw==)
 
-hostname: ENC(5H01n5YFZSpX7RchqwfV1yMJ4aRIhyXg)
+hostname: ENC(gHEhGUxcT6N2x/YrCy7fvAcAmYnn5xiOuXXqPJG9YgA=)
