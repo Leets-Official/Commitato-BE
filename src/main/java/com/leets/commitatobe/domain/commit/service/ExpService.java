@@ -125,7 +125,7 @@ public class ExpService {
 			.orElseThrow(() -> new ApiException(ErrorStatus._TIER_NOT_FOUND));
 	}
 
-	public ExpAndTierResponse updateExpAndTier(int exp){
+	public ExpAndTierResponse updateExpAndTier(int exp) {
 		String gitHubId = loginQueryService.getGitHubId();
 		User user = userRepository.findByGithubId(gitHubId)
 			.orElseThrow(() -> new ApiException(_USER_NOT_FOUND));
