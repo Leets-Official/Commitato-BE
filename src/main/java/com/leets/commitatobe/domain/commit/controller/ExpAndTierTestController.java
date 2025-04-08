@@ -16,7 +16,7 @@ import lombok.RequiredArgsConstructor;
 @Tag(name = "Exp, Tier 업데이트 컨트롤러", description = "입력한 Exp에 따른 사용자의 Exp와 Tier 데이터 가공을 처리합니다.")
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/update/exp-tier")
+@RequestMapping
 public class ExpAndTierTestController {
 	private final ExpService expService;
 
