@@ -1,5 +1,7 @@
 package com.leets.commitatobe.domain.commit.service;
 
+import static com.leets.commitatobe.global.response.code.status.ErrorStatus.*;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
@@ -10,7 +12,9 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
 import com.leets.commitatobe.domain.commit.domain.Commit;
+import com.leets.commitatobe.domain.commit.dto.response.ExpAndTierResponse;
 import com.leets.commitatobe.domain.commit.repository.CommitRepository;
+import com.leets.commitatobe.domain.login.service.LoginQueryService;
 import com.leets.commitatobe.domain.tier.domain.Tier;
 import com.leets.commitatobe.domain.tier.repository.TierRepository;
 import com.leets.commitatobe.domain.user.domain.User;
@@ -28,6 +32,7 @@ public class ExpService {
 	private final CommitRepository commitRepository;
 	private final UserRepository userRepository;
 	private final TierRepository tierRepository;
+	private final LoginQueryService loginQueryService;
 
 	private static final int DAILY_BONUS_EXP = 100;
 	private static final int BONUS_EXP_INCREASE = 10;
@@ -118,5 +123,17 @@ public class ExpService {
 			.filter(tier -> tier.isValid(exp))
 			.max(Comparator.comparing(Tier::getRequiredExp))
 			.orElseThrow(() -> new ApiException(ErrorStatus._TIER_NOT_FOUND));
+	}
+
+	public ExpAndTierResponse updateExpAndTier(int exp) {
+		String gitHubId = loginQueryService.getGitHubId();
+		User user = userRepository.findByGithubId(gitHubId)
+			.orElseThrow(() -> new ApiException(_USER_NOT_FOUND));
+
+		user.updateExp(exp);
+		Tier tier = determineTier(exp);
+		user.updateTier(tier);
+
+		return ExpAndTierResponse.from(user);
 	}
 }
