@@ -1,4 +1,8 @@
 spring:
+  data:
+    elasticsearch:
+      repositories:
+        enabled: true
   elasticsearch:
     uris: ENC(c4D0381DRDiy6fOYvGdITd7tcIKeXOaybB0UnUU6UQPfHbQ7hUqlkA==)
   application:
@@ -57,5 +61,3 @@ management:
       application: ${spring.application.name}
 
 server-uri: ENC(ugcPjCCqPIKcaBDy9haOfZilhoZ/l2WM1vpO5WjxC2CSIgYPy6s/KQ==)
-
-hostname: ENC(3CKjsUB/j+kYs1Wd0T4IdMqCPbbHBGNXs+/SnY3XThc=)

@@ -1,4 +1,8 @@
 spring:
+  data:
+    elasticsearch:
+      repositories:
+        enabled: true
   elasticsearch:
     uris: http://localhost:9200
   application:
@@ -56,5 +60,3 @@ management:
       application: ${spring.application.name}
 
 server-uri: http://localhost:8080
-
-hostname: ENC(KGCaSctauQhQQgsDzQiSY6qqFEn7ANxV)
