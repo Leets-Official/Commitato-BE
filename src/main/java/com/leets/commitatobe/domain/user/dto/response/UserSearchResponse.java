@@ -11,11 +11,13 @@ public record UserSearchResponse(
 	Integer consecutiveCommitDays
 ) {
 	public static UserSearchResponse from(User user) {
+		String tierName = user.getTier() != null ? user.getTier().getTierName() : "Unranked";
+
 		return new UserSearchResponse(
 			user.getId().toString(),
 			user.getGithubId(),
 			user.getRanking(),
-			user.getTier().getTierName(),
+			tierName,
 			user.getExp(),
 			user.getConsecutiveCommitDays()
 		);
