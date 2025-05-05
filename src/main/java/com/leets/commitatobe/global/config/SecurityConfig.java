@@ -32,6 +32,16 @@ public class SecurityConfig {
 	@Value("${management.endpoints.web.base-path}")
 	private String actuatorEndPoint;
 
+	private String[] getAuthWhitelist() {
+		return new String[] {
+			"/v3/api-docs/**",
+			"/swagger-ui/**",
+			"/login/**",
+			actuatorEndPoint + "/**",
+			"/user/**",
+		};
+	}
+
 	@Bean
 	public PasswordEncoder passwordEncoder() {
 		return new BCryptPasswordEncoder();
@@ -49,10 +59,9 @@ public class SecurityConfig {
 				.loginPage("/login/github"))
 			.authorizeHttpRequests((authorize) ->
 				authorize
-					.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/commit/**",
-						"/login/**", "/auth/**", "/h2-console/**", "/error/**", actuatorEndPoint + "/**",
-						"/user/ranking").permitAll()
-					.anyRequest().authenticated()
+					.requestMatchers("/commit/**", "/user/update/exp-tier").authenticated()
+					.requestMatchers(getAuthWhitelist()).permitAll()
+					.anyRequest().denyAll()
 			)
 			.headers(headers -> headers
 				.frameOptions(HeadersConfigurer.FrameOptionsConfig::disable) // H2 콘솔 프레임 옵션 설정
