@@ -57,7 +57,7 @@ public class AuthService {
 			.build();
 
 		// GitHub 액세스 토큰 요청
-		String tokenRequestUrl = "/auth/oauth/access_token" +
+		String tokenRequestUrl = "/login/oauth/access_token" +
 			"?client_id=" + clientId +
 			"&client_secret=" + clientSecret +
 			"&code=" + authCode +

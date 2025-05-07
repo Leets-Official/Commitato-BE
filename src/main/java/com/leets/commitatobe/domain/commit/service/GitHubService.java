@@ -87,8 +87,8 @@ public class GitHubService {
 		for (int i = 0; i < contributors.size(); i++) {
 			JsonObject contributor = contributors.get(i).getAsJsonObject();
 
-			if (contributor.has("auth") && !contributor.get("auth").isJsonNull()) {
-				String contributorLogin = contributor.get("auth").getAsString();
+			if (contributor.has("login") && !contributor.get("login").isJsonNull()) {
+				String contributorLogin = contributor.get("login").getAsString();
 
 				if (contributorLogin.equals(gitHubUsername)) {
 					return true;
@@ -169,7 +169,7 @@ public class GitHubService {
 
 	private boolean validateAuthor(JsonObject commitJson, String gitHubUsername) {
 		if (commitJson.has("author") && !commitJson.get("author").isJsonNull()) {
-			JsonElement topAuthor = commitJson.getAsJsonObject("author").get("auth");
+			JsonElement topAuthor = commitJson.getAsJsonObject("author").get("login");
 			if (topAuthor != null && !topAuthor.isJsonNull()) {
 				return topAuthor.getAsString().equals(gitHubUsername);
 			}

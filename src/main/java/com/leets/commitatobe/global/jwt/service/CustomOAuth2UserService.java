@@ -56,7 +56,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 			.tokenUri("https://github.com/login/oauth/access_token")
 			.authorizationUri("https://github.com/login/oauth/authorize")
 			.userInfoUri("https://api.github.com/user")
-			.userNameAttributeName("auth")  // GitHub의 로그인 이름 속성을 지정
+			.userNameAttributeName("login")  // GitHub의 로그인 이름 속성을 지정
 			.build();
 
 		OAuth2UserRequest userRequest = new OAuth2UserRequest(
@@ -74,14 +74,14 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 		return new DefaultOAuth2User(
 			Collections.singleton(new SimpleGrantedAuthority("ROLE_USER")),
 			oAuth2User.getAttributes(),
-			"auth");
+			"login");
 
 	}
 
 	public LoginResponse loadUserAndJwt(OAuth2UserRequest userRequest, String gitHubAccessToken) throws
 		OAuth2AuthenticationException {
 		OAuth2User oAuth2User = loadUser(userRequest);
-		String githubId = oAuth2User.getAttribute("auth");
+		String githubId = oAuth2User.getAttribute("login");
 
 		JwtResponse jwt = jwtProvider.generateTokenDto(githubId);
 
@@ -100,7 +100,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 	}
 
 	private User createNewUser(OAuth2User oAuth2User) {
-		String githubId = oAuth2User.getAttribute("auth");
+		String githubId = oAuth2User.getAttribute("login");
 		String username = oAuth2User.getAttribute("name");
 		String profileImage = oAuth2User.getAttribute("avatar_url");
 
