@@ -10,7 +10,6 @@ import com.leets.commitatobe.domain.auth.dto.LoginResponse;
 import com.leets.commitatobe.domain.auth.service.AuthService;
 import com.leets.commitatobe.domain.auth.service.AuthQueryService;
 import com.leets.commitatobe.domain.user.service.UserQueryService;
-import com.leets.commitatobe.global.jwt.dto.JwtResponse;
 import com.leets.commitatobe.global.jwt.service.CustomOAuth2UserService;
 import com.leets.commitatobe.global.response.ApiResponse;
 
