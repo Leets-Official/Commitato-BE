@@ -76,7 +76,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
 	}
 
-	public JwtResponse loadUserAndJwt(OAuth2UserRequest userRequest, String gitHubAccessToken) throws
+	private JwtResponse loadUserAndJwt(OAuth2UserRequest userRequest, String gitHubAccessToken) throws
 		OAuth2AuthenticationException {
 		OAuth2User oAuth2User = loadUser(userRequest);
 		String githubId = oAuth2User.getAttribute("auth");
@@ -84,18 +84,16 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 		JwtResponse jwt = jwtProvider.generateTokenDto(githubId);
 
 		User user = userRepository.findByGithubId(githubId)
-			.orElseGet(() -> createNewUser(oAuth2User, gitHubAccessToken));
+			.orElseGet(() -> createNewUser(oAuth2User));
 
-		String encryptedGitHubAccessToken = authService.encrypt(gitHubAccessToken);
-
-		user.updateGitHubAccessToken(encryptedGitHubAccessToken);
+		user.updateGitHubAccessToken(authService.encrypt(gitHubAccessToken));
 
 		userRepository.save(user);
 
 		return jwt;
 	}
 
-	public User createNewUser(OAuth2User oAuth2User, String gitHubAccessToken) {
+	private User createNewUser(OAuth2User oAuth2User) {
 		String githubId = oAuth2User.getAttribute("auth");
 		String username = oAuth2User.getAttribute("name");
 		String profileImage = oAuth2User.getAttribute("avatar_url");
