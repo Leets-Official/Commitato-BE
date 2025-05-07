@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.leets.commitatobe.domain.auth.dto.GitHubDto;
+import com.leets.commitatobe.domain.auth.dto.LoginResponse;
 import com.leets.commitatobe.domain.auth.service.AuthService;
 import com.leets.commitatobe.domain.auth.service.AuthQueryService;
 import com.leets.commitatobe.domain.user.service.UserQueryService;
@@ -53,16 +54,14 @@ public class AuthController {
 		example = "123456"
 	)
 	@GetMapping("/callback")
-	public ApiResponse<JwtResponse> githubCallback(@RequestParam("code") String code, HttpServletResponse response) {
-		// GitHub에서 받은 인가 코드로 액세스 토큰 요청
+	public ApiResponse<LoginResponse> githubCallback(@RequestParam("code") String code, HttpServletResponse response) {
 		String gitHubAccessToken = authService.gitHubLogin(code);
-		// 액세스 토큰을 이용하여 JWT 생성
-		JwtResponse jwt = customOAuth2UserService.generateJwt(gitHubAccessToken);
 
-		// 액세스 토큰을 헤더에 설정
-		response.setHeader("Authentication", "Bearer " + jwt.accessToken());
+		LoginResponse loginResponse = customOAuth2UserService.generateJwt(gitHubAccessToken);
 
-		return ApiResponse.onSuccess(jwt);
+		response.setHeader("Authentication", "Bearer " + loginResponse.jwtResponse().accessToken());
+
+		return ApiResponse.onSuccess(loginResponse);
 	}
 
 	// 사용자 로그인 및 github 엑세스 토큰이 잘 받아와지는지 확인하는 테스트 api
