@@ -36,7 +36,7 @@ public class SecurityConfig {
 		return new String[] {
 			"/v3/api-docs/**",
 			"/swagger-ui/**",
-			"/login/**",
+			"/auth/**",
 			actuatorEndPoint + "/**",
 			"/user/**",
 		};

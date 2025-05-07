@@ -17,7 +17,7 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.leets.commitatobe.domain.login.service.LoginCommandService;
+import com.leets.commitatobe.domain.auth.service.AuthService;
 import com.leets.commitatobe.domain.user.domain.User;
 import com.leets.commitatobe.domain.user.repository.UserRepository;
 import com.leets.commitatobe.global.jwt.dto.JwtResponse;
@@ -43,7 +43,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 	private final UserRepository userRepository;
 
 	@Autowired
-	private LoginCommandService loginCommandService;
+	private AuthService authService;
 
 	public JwtResponse generateJwt(String gitHubAccessToken) {
 		ClientRegistration clientRegistration = ClientRegistration.withRegistrationId("github")
@@ -54,7 +54,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 			.tokenUri("https://github.com/login/oauth/access_token")
 			.authorizationUri("https://github.com/login/oauth/authorize")
 			.userInfoUri("https://api.github.com/user")
-			.userNameAttributeName("login")  // GitHub의 로그인 이름 속성을 지정
+			.userNameAttributeName("auth")  // GitHub의 로그인 이름 속성을 지정
 			.build();
 
 		OAuth2UserRequest userRequest = new OAuth2UserRequest(
@@ -72,21 +72,21 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 		return new DefaultOAuth2User(
 			Collections.singleton(new SimpleGrantedAuthority("ROLE_USER")),
 			oAuth2User.getAttributes(),
-			"login");
+			"auth");
 
 	}
 
 	public JwtResponse loadUserAndJwt(OAuth2UserRequest userRequest, String gitHubAccessToken) throws
 		OAuth2AuthenticationException {
 		OAuth2User oAuth2User = loadUser(userRequest);
-		String githubId = oAuth2User.getAttribute("login");
+		String githubId = oAuth2User.getAttribute("auth");
 
 		JwtResponse jwt = jwtProvider.generateTokenDto(githubId);
 
 		User user = userRepository.findByGithubId(githubId)
 			.orElseGet(() -> createNewUser(oAuth2User, gitHubAccessToken));
 
-		String encryptedGitHubAccessToken = loginCommandService.encrypt(gitHubAccessToken);
+		String encryptedGitHubAccessToken = authService.encrypt(gitHubAccessToken);
 
 		user.updateGitHubAccessToken(encryptedGitHubAccessToken);
 
@@ -96,7 +96,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 	}
 
 	public User createNewUser(OAuth2User oAuth2User, String gitHubAccessToken) {
-		String githubId = oAuth2User.getAttribute("login");
+		String githubId = oAuth2User.getAttribute("auth");
 		String username = oAuth2User.getAttribute("name");
 		String profileImage = oAuth2User.getAttribute("avatar_url");
 

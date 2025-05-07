@@ -1,11 +1,11 @@
-package com.leets.commitatobe.domain.login.domain;
+package com.leets.commitatobe.domain.auth.domain;
 
 import java.util.Collection;
 
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
-import com.leets.commitatobe.domain.login.dto.GitHubDto;
+import com.leets.commitatobe.domain.auth.dto.GitHubDto;
 
 import lombok.Getter;
 

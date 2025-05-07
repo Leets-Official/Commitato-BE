@@ -1,4 +1,4 @@
-package com.leets.commitatobe.domain.login.service;
+package com.leets.commitatobe.domain.auth.service;
 
 import static ch.qos.logback.core.encoder.ByteArrayUtil.*;
 import static com.leets.commitatobe.global.response.code.status.ErrorStatus.*;
@@ -28,7 +28,7 @@ import reactor.core.publisher.Mono;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class LoginCommandService {
+public class AuthService {
 
 	// 암호화 알고리즘
 	private final String ENCODING_ALGORITHM = "AES/CBC/PKCS5Padding";
@@ -57,7 +57,7 @@ public class LoginCommandService {
 			.build();
 
 		// GitHub 액세스 토큰 요청
-		String tokenRequestUrl = "/login/oauth/access_token" +
+		String tokenRequestUrl = "/auth/oauth/access_token" +
 			"?client_id=" + clientId +
 			"&client_secret=" + clientSecret +
 			"&code=" + authCode +
