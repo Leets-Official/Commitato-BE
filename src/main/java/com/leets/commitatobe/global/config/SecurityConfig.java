@@ -34,11 +34,12 @@ public class SecurityConfig {
 
 	private String[] getAuthWhitelist() {
 		return new String[] {
+			"/error",
 			"/v3/api-docs/**",
 			"/swagger-ui/**",
 			"/login/**",
 			actuatorEndPoint + "/**",
-			"/user/**",
+			"/user/**"
 		};
 	}
 

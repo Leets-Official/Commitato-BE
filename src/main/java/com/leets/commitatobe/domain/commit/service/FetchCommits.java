@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 import com.leets.commitatobe.domain.commit.domain.Commit;
 import com.leets.commitatobe.domain.commit.dto.response.CommitResponse;
 import com.leets.commitatobe.domain.commit.repository.CommitRepository;
-import com.leets.commitatobe.domain.login.service.LoginQueryService;
+import com.leets.commitatobe.domain.auth.service.AuthQueryService;
 import com.leets.commitatobe.domain.user.domain.User;
 import com.leets.commitatobe.domain.user.repository.UserRepository;
 import com.leets.commitatobe.domain.user.service.UserQueryService;
@@ -27,12 +27,12 @@ public class FetchCommits {
 	private final CommitRepository commitRepository;
 	private final UserRepository userRepository;
 	private final GitHubService gitHubService; // GitHub API 통신
-	private final LoginQueryService loginQueryService;
+	private final AuthQueryService authQueryService;
 	private final ExpService expService;
 	private final UserQueryService userQueryService;
 
 	public CommitResponse execute() {
-		String gitHubId = loginQueryService.getGitHubId();
+		String gitHubId = authQueryService.getGitHubId();
 		User user = userRepository.findByGithubId(gitHubId)
 			.orElseThrow(() -> new UsernameNotFoundException("해당하는 깃허브 닉네임과 일치하는 유저를 찾을 수 없음: " + gitHubId));
 

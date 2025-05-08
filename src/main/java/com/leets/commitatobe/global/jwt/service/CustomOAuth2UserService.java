@@ -5,6 +5,7 @@ import java.util.Collections;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.util.Pair;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
@@ -17,7 +18,8 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.leets.commitatobe.domain.login.service.LoginCommandService;
+import com.leets.commitatobe.domain.auth.dto.LoginResponse;
+import com.leets.commitatobe.domain.auth.service.AuthService;
 import com.leets.commitatobe.domain.user.domain.User;
 import com.leets.commitatobe.domain.user.repository.UserRepository;
 import com.leets.commitatobe.global.jwt.dto.JwtResponse;
@@ -43,9 +45,9 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 	private final UserRepository userRepository;
 
 	@Autowired
-	private LoginCommandService loginCommandService;
+	private AuthService authService;
 
-	public JwtResponse generateJwt(String gitHubAccessToken) {
+	public LoginResponse generateJwt(String gitHubAccessToken) {
 		ClientRegistration clientRegistration = ClientRegistration.withRegistrationId("github")
 			.clientId(clientId)
 			.clientSecret(clientSecret)
@@ -76,26 +78,28 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
 	}
 
-	public JwtResponse loadUserAndJwt(OAuth2UserRequest userRequest, String gitHubAccessToken) throws
+	public LoginResponse loadUserAndJwt(OAuth2UserRequest userRequest, String gitHubAccessToken) throws
 		OAuth2AuthenticationException {
 		OAuth2User oAuth2User = loadUser(userRequest);
 		String githubId = oAuth2User.getAttribute("login");
 
 		JwtResponse jwt = jwtProvider.generateTokenDto(githubId);
 
-		User user = userRepository.findByGithubId(githubId)
-			.orElseGet(() -> createNewUser(oAuth2User, gitHubAccessToken));
+		Pair<User, Boolean> userWithStatus = userRepository.findByGithubId(githubId)
+			.map(user -> Pair.of(user, false))
+			.orElseGet(() -> Pair.of(createNewUser(oAuth2User), true));
 
-		String encryptedGitHubAccessToken = loginCommandService.encrypt(gitHubAccessToken);
+		User user = userWithStatus.getFirst();
+		boolean isNewUser = userWithStatus.getSecond();
 
-		user.updateGitHubAccessToken(encryptedGitHubAccessToken);
+		user.updateGitHubAccessToken(authService.encrypt(gitHubAccessToken));
 
 		userRepository.save(user);
 
-		return jwt;
+		return LoginResponse.of(isNewUser, jwt);
 	}
 
-	public User createNewUser(OAuth2User oAuth2User, String gitHubAccessToken) {
+	private User createNewUser(OAuth2User oAuth2User) {
 		String githubId = oAuth2User.getAttribute("login");
 		String username = oAuth2User.getAttribute("name");
 		String profileImage = oAuth2User.getAttribute("avatar_url");

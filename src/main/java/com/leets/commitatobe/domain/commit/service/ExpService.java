@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 import com.leets.commitatobe.domain.commit.domain.Commit;
 import com.leets.commitatobe.domain.commit.dto.response.ExpAndTierResponse;
 import com.leets.commitatobe.domain.commit.repository.CommitRepository;
-import com.leets.commitatobe.domain.login.service.LoginQueryService;
+import com.leets.commitatobe.domain.auth.service.AuthQueryService;
 import com.leets.commitatobe.domain.tier.domain.Tier;
 import com.leets.commitatobe.domain.tier.repository.TierRepository;
 import com.leets.commitatobe.domain.user.domain.User;
@@ -32,7 +32,7 @@ public class ExpService {
 	private final CommitRepository commitRepository;
 	private final UserRepository userRepository;
 	private final TierRepository tierRepository;
-	private final LoginQueryService loginQueryService;
+	private final AuthQueryService authQueryService;
 
 	private static final int DAILY_BONUS_EXP = 100;
 	private static final int BONUS_EXP_INCREASE = 10;
@@ -126,7 +126,7 @@ public class ExpService {
 	}
 
 	public ExpAndTierResponse updateExpAndTier(int exp) {
-		String gitHubId = loginQueryService.getGitHubId();
+		String gitHubId = authQueryService.getGitHubId();
 		User user = userRepository.findByGithubId(gitHubId)
 			.orElseThrow(() -> new ApiException(_USER_NOT_FOUND));
 

@@ -1,16 +1,16 @@
-package com.leets.commitatobe.domain.login.service;
+package com.leets.commitatobe.domain.auth.service;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
-import com.leets.commitatobe.domain.login.domain.CustomUserDetails;
-import com.leets.commitatobe.domain.login.dto.GitHubDto;
+import com.leets.commitatobe.domain.auth.domain.CustomUserDetails;
+import com.leets.commitatobe.domain.auth.dto.GitHubDto;
 import com.leets.commitatobe.global.exception.ApiException;
 import com.leets.commitatobe.global.response.code.status.ErrorStatus;
 
 @Service
-public class LoginQueryService {
+public class AuthQueryService {
 
 	public GitHubDto getGitHubUser() {
 		CustomUserDetails userDetails = getUserDetails();

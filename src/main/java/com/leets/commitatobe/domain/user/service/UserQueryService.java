@@ -13,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.leets.commitatobe.domain.commit.domain.Commit;
 import com.leets.commitatobe.domain.commit.repository.CommitRepository;
-import com.leets.commitatobe.domain.login.service.LoginCommandService;
+import com.leets.commitatobe.domain.auth.service.AuthService;
 import com.leets.commitatobe.domain.tier.domain.Tier;
 import com.leets.commitatobe.domain.user.domain.User;
 import com.leets.commitatobe.domain.user.domain.UserDocument;
@@ -34,7 +34,7 @@ import lombok.RequiredArgsConstructor;
 public class UserQueryService {
 	private final UserRepository userRepository;
 	private final CommitRepository commitRepository;
-	private final LoginCommandService loginCommandService;
+	private final AuthService authService;
 	private final UserSearchRepository userSearchRepository;
 
 	private User getUser(String githubId) {
@@ -104,7 +104,7 @@ public class UserQueryService {
 		User user = getUser(githubId);
 		String gitHubAccessToken = user.getGitHubAccessToken();
 
-		return loginCommandService.decrypt(gitHubAccessToken);
+		return authService.decrypt(gitHubAccessToken);
 	}
 
 	public UserInfoResponse findUserInfo(String githubId, String myGitHubId) {

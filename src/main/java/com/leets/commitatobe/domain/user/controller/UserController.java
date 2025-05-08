@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.leets.commitatobe.domain.login.service.LoginQueryService;
+import com.leets.commitatobe.domain.auth.service.AuthQueryService;
 import com.leets.commitatobe.domain.user.domain.UserDocument;
 import com.leets.commitatobe.domain.user.dto.response.UserCommitResponse;
 import com.leets.commitatobe.domain.user.dto.response.UserInfoResponse;
@@ -25,7 +25,7 @@ import lombok.RequiredArgsConstructor;
 @RequestMapping("/user")
 public class UserController {
 	private final UserQueryService userQueryService;
-	private final LoginQueryService loginQueryService;
+	private final AuthQueryService authQueryService;
 
 	@Operation(
 		summary = "사용자 검색",
@@ -48,7 +48,7 @@ public class UserController {
 
 	@GetMapping("/{githubId}")
 	public ApiResponse<UserInfoResponse> getUserInfo(@PathVariable("githubId") String githubId) {
-		String myGitHubId = loginQueryService.getGitHubId();
+		String myGitHubId = authQueryService.getGitHubId();
 		return ApiResponse.onSuccess(userQueryService.findUserInfo(githubId, myGitHubId));
 	}
 
