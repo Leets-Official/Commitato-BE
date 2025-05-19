@@ -11,6 +11,7 @@ import lombok.Builder;
 public record UserInfoResponse(
 	Boolean isMyAccount,
 	String githubId,
+	String githubUsername,
 	Integer exp,
 	Integer ranking,
 	String tierName,
@@ -24,6 +25,7 @@ public record UserInfoResponse(
 		return UserInfoResponse.builder()
 			.isMyAccount(isMyAccount)
 			.githubId(user.getGithubId())
+			.githubUsername(user.getUsername())
 			.exp(user.getExp())
 			.ranking(user.getRanking())
 			.tierName(user.getTier().getTierName())
