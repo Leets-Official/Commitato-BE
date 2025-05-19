@@ -18,6 +18,7 @@ import com.leets.commitatobe.domain.tier.domain.Tier;
 import com.leets.commitatobe.domain.user.domain.User;
 import com.leets.commitatobe.domain.user.domain.UserDocument;
 import com.leets.commitatobe.domain.user.dto.response.UserCommitResponse;
+import com.leets.commitatobe.domain.user.dto.response.UserHoverInfoResponse;
 import com.leets.commitatobe.domain.user.dto.response.UserInfoResponse;
 import com.leets.commitatobe.domain.user.dto.response.UserRankResponse;
 import com.leets.commitatobe.domain.user.dto.response.UserSearchResponse;
@@ -111,5 +112,11 @@ public class UserQueryService {
 		User user = getUser(githubId);
 
 		return UserInfoResponse.of(githubId.equals(myGitHubId), user);
+	}
+
+	public UserHoverInfoResponse findUserHoverInfo(String githubId) {
+		User user = userRepository.findByGithubId(githubId).orElseThrow(() -> new ApiException(_USER_NOT_FOUND));
+
+		return UserHoverInfoResponse.from(user);
 	}
 }
