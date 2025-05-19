@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.leets.commitatobe.domain.auth.service.AuthQueryService;
 import com.leets.commitatobe.domain.user.domain.UserDocument;
 import com.leets.commitatobe.domain.user.dto.response.UserCommitResponse;
+import com.leets.commitatobe.domain.user.dto.response.UserHoverInfoResponse;
 import com.leets.commitatobe.domain.user.dto.response.UserInfoResponse;
 import com.leets.commitatobe.domain.user.dto.response.UserRankResponse;
 import com.leets.commitatobe.domain.user.service.UserQueryService;
@@ -50,6 +51,11 @@ public class UserController {
 	public ApiResponse<UserInfoResponse> getUserInfo(@PathVariable("githubId") String githubId) {
 		String myGitHubId = authQueryService.getGitHubId();
 		return ApiResponse.onSuccess(userQueryService.findUserInfo(githubId, myGitHubId));
+	}
+
+	@GetMapping("/{githubId}/hover")
+	public ApiResponse<UserHoverInfoResponse> getUserHoverInfo(@PathVariable("githubId") String githubId) {
+		return ApiResponse.onSuccess(userQueryService.findUserHoverInfo(githubId));
 	}
 
 	@Operation(
