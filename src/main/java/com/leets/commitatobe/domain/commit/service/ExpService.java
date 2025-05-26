@@ -77,7 +77,6 @@ public class ExpService {
 		user.updateTotalCommitCount(totalCommitCount);
 		user.updateTodayCommitCount(todayCommitCount);
 
-		updateUserRankings();
 		commitRepository.saveAll(commits);//변경된 커밋 정보 데이터베이스에 저장
 		userRepository.save(user);//변경된 사용자 정보 데이터베이스에 저장
 	}
@@ -101,20 +100,6 @@ public class ExpService {
 		}
 
 		return 1;
-	}
-
-	private void updateUserRankings() {
-		List<User> allUsers = userRepository.findAllByOrderByExpDesc(Pageable.unpaged()).getContent();
-		int ranking = 0;
-		int previousExp = -1;
-		for (User userToUpdate : allUsers) {
-			if (userToUpdate.getExp() != previousExp) {
-				ranking++;
-				previousExp = userToUpdate.getExp();
-			}
-			userToUpdate.updateRank(ranking);
-			userRepository.save(userToUpdate);
-		}
 	}
 
 	private Tier determineTier(Integer exp) {
