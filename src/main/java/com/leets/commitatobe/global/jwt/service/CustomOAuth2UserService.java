@@ -20,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.leets.commitatobe.domain.auth.dto.LoginResponse;
 import com.leets.commitatobe.domain.auth.service.AuthService;
+import com.leets.commitatobe.domain.tier.domain.Tier;
+import com.leets.commitatobe.domain.tier.repository.TierRepository;
 import com.leets.commitatobe.domain.user.domain.User;
 import com.leets.commitatobe.domain.user.repository.UserRepository;
 import com.leets.commitatobe.global.jwt.dto.JwtResponse;
@@ -43,6 +45,8 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 	private JwtProvider jwtProvider;
 
 	private final UserRepository userRepository;
+
+	private final TierRepository tierRepository;
 
 	@Autowired
 	private AuthService authService;
@@ -103,11 +107,13 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 		String githubId = oAuth2User.getAttribute("login");
 		String username = oAuth2User.getAttribute("name");
 		String profileImage = oAuth2User.getAttribute("avatar_url");
+		Tier tier = tierRepository.findByRequiredExp(0).orElseThrow(() -> new IllegalStateException("기본 티어를 찾을 수 없습니다."));
 
 		User user = User.builder()
 			.githubId(githubId)
 			.username(username)
 			.profileImage(profileImage)
+			.tier(tier)
 			.exp(0)
 			.build();
 
