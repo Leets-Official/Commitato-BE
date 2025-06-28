@@ -11,9 +11,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.leets.commitatobe.domain.auth.service.AuthService;
 import com.leets.commitatobe.domain.commit.domain.Commit;
 import com.leets.commitatobe.domain.commit.repository.CommitRepository;
-import com.leets.commitatobe.domain.auth.service.AuthService;
 import com.leets.commitatobe.domain.tier.domain.Tier;
 import com.leets.commitatobe.domain.user.domain.User;
 import com.leets.commitatobe.domain.user.domain.UserDocument;
@@ -55,7 +55,6 @@ public class UserQueryService {
 				response.id(),
 				response.githubId(),
 				response.tierName(),
-				response.ranking(),
 				response.exp(),
 				response.consecutiveCommitDays()
 			);
@@ -84,8 +83,7 @@ public class UserQueryService {
 				user.getGithubId(),
 				user.getExp(),
 				user.getConsecutiveCommitDays(),
-				tier != null ? tier.getTierName() : "Unranked",
-				user.getRanking());//랭킹 추가
+				tier != null ? tier.getTierName() : "Unranked");//랭킹 추가
 		});
 
 		return CustomPageResponse.from(userRankResponses);
