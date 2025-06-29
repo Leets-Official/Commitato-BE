@@ -13,7 +13,6 @@ public record UserInfoResponse(
 	String githubId,
 	String githubUsername,
 	Integer exp,
-	Integer ranking,
 	String tierName,
 	String characterUrl,
 	Integer consecutiveCommitDays,
@@ -27,7 +26,6 @@ public record UserInfoResponse(
 			.githubId(user.getGithubId())
 			.githubUsername(user.getUsername())
 			.exp(user.getExp())
-			.ranking(user.getRanking())
 			.tierName(user.getTier().getTierName())
 			.characterUrl(user.getTier().getCharacterUrl())
 			.consecutiveCommitDays(user.getConsecutiveCommitDays())
