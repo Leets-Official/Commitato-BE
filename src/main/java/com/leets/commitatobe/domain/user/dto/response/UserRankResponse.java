@@ -4,7 +4,6 @@ public record UserRankResponse(
 	String githubId,
 	Integer exp,
 	Integer consecutiveCommitDays,
-	String tierName,
-	Integer ranking
+	String tierName
 ) {
 }

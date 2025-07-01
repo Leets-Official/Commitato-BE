@@ -84,8 +84,7 @@ public class UserQueryService {
 				user.getGithubId(),
 				user.getExp(),
 				user.getConsecutiveCommitDays(),
-				tier != null ? tier.getTierName() : "Unranked",
-				user.getRanking());//랭킹 추가
+				tier != null ? tier.getTierName() : "Unranked");
 		});
 
 		return CustomPageResponse.from(userRankResponses);
