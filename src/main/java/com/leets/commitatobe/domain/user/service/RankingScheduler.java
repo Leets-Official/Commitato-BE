@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.leets.commitatobe.domain.user.domain.User;
@@ -11,6 +12,7 @@ import com.leets.commitatobe.domain.user.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
 
+@Component
 @RequiredArgsConstructor
 public class RankingScheduler {
 	private final UserRepository userRepository;
