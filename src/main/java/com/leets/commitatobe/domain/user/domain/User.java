@@ -58,6 +58,9 @@ public class User extends BaseTimeEntity {
 	@Builder.Default
 	private Integer todayCommitCount = 0;
 
+	@Column
+	private Integer ranking;// 랭킹 추가
+
 	@ManyToOne
 	@JoinColumn(name = "tier_id")
 	private Tier tier;
@@ -83,6 +86,10 @@ public class User extends BaseTimeEntity {
 
 	public void updateTodayCommitCount(Integer todayCommitCount) {
 		this.todayCommitCount = todayCommitCount;
+	}
+
+	public void updateRank(Integer ranking) {
+		this.ranking = ranking;
 	}
 
 	public void updateLastCommitUpdateTime(LocalDateTime lastCommitUpdateTime) {
