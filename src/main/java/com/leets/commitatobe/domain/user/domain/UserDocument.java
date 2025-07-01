@@ -16,6 +16,7 @@ public class UserDocument {
 	private String id;
 	private String githubId;
 	private String tierName;
+	private Integer ranking;
 	private Integer exp;
 	private Integer consecutiveCommitDays;
 }
