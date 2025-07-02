@@ -5,6 +5,7 @@ import com.leets.commitatobe.domain.user.domain.User;
 public record UserSearchResponse(
 	String id,
 	String githubId,
+	Integer ranking,
 	String tierName,
 	Integer exp,
 	Integer consecutiveCommitDays
@@ -15,6 +16,7 @@ public record UserSearchResponse(
 		return new UserSearchResponse(
 			user.getId().toString(),
 			user.getGithubId(),
+			user.getRanking(),
 			tierName,
 			user.getExp(),
 			user.getConsecutiveCommitDays()

@@ -55,6 +55,7 @@ public class UserQueryService {
 				response.id(),
 				response.githubId(),
 				response.tierName(),
+				response.ranking(),
 				response.exp(),
 				response.consecutiveCommitDays()
 			);
@@ -83,7 +84,7 @@ public class UserQueryService {
 				user.getGithubId(),
 				user.getExp(),
 				user.getConsecutiveCommitDays(),
-				tier != null ? tier.getTierName() : "Unranked");//랭킹 추가
+				tier != null ? tier.getTierName() : "Unranked");
 		});
 
 		return CustomPageResponse.from(userRankResponses);
