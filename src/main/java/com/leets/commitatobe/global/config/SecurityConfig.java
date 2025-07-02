@@ -32,7 +32,7 @@ public class SecurityConfig {
 	@Value("${management.endpoints.web.base-path}")
 	private String actuatorEndPoint;
 
-	@Value("${server.url}")
+	@Value("${server-uri}")
 	private String serverUrl;
 
 	private String[] getAuthWhitelist() {
