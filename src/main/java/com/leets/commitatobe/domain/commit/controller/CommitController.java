@@ -6,7 +6,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.leets.commitatobe.domain.commit.dto.response.CommitResponse;
 import com.leets.commitatobe.domain.commit.service.FetchCommits;
-import com.leets.commitatobe.domain.commit.service.FetchCommitsTest;
 import com.leets.commitatobe.global.response.ApiResponse;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -19,7 +18,6 @@ import lombok.RequiredArgsConstructor;
 @RequestMapping("/commit")
 public class CommitController {
 	private final FetchCommits fetchCommits;
-	private final FetchCommitsTest fetchCommitsTest;
 
 	@Operation(
 		summary = "커밋 기록 업데이트",
@@ -27,13 +25,5 @@ public class CommitController {
 	@PostMapping("/update")
 	public ApiResponse<CommitResponse> fetchCommits() {
 		return ApiResponse.onSuccess(fetchCommits.execute());
-	}
-
-	@Operation(
-		summary = "커밋 기록 업데이트 (테스트)",
-		description = "테스트를 위해, 최근 3개월의 커밋 기록을 가져와 DB에 저장하고 사용자의 정보를 최신화 합니다.")
-	@PostMapping("update/test")
-	public ApiResponse<CommitResponse> fetchCommitsTest() {
-		return ApiResponse.onSuccess(fetchCommitsTest.execute());
 	}
 }
