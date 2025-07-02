@@ -46,11 +46,13 @@ public class ExpService {
 		LocalDateTime lastCommitDate = null; //마지막 커밋 날짜
 		int totalExp = user.getExp(); //사용자의 현재 경험치
 		int totalCommitCount = user.getTotalCommitCount(); //총 커밋 횟수
-		int todayCommitCount = user.getTodayCommitCount(); //오늘 커밋 횟수
+		int todayCommitCount = 0;
 
 		for (Commit commit : commits) {//각 커밋을 반복해서 계산
-			if (commit.isCalculated())
-				continue;//이미 계산된 커밋
+			if (commit.isCalculated()) {
+				continue; // 이미 계산된 커밋
+			}
+
 			LocalDateTime commitDate = commit.getCommitDate();//커밋날짜를 가져와 시간 설정
 
 			consecutiveDays = updateConsecutiveDays(lastCommitDate, commitDate, consecutiveDays);
@@ -58,13 +60,18 @@ public class ExpService {
 			totalExp += commit.calculateExp(DAILY_BONUS_EXP, consecutiveDays, BONUS_EXP_INCREASE);//총 경험치 업데이트
 			totalCommitCount += commit.getCnt();//총 커밋 횟수
 
-			if (commit.commitDateIsToday()) {
-				todayCommitCount = commit.getCnt();//오늘날짜의 커밋 개수 카운트
-			}
-
 			commit.markAsCalculated();//커밋 계산 여부를 true로 해서 다음 게산에서 제외
 			lastCommitDate = commitDate;//마지막 커밋날짜를 현재 커밋날짜로 업데이트
 		}
+
+		if(!commits.isEmpty()){
+			Commit lastCommit = commits.get(commits.size() - 1);
+
+			if (lastCommit.getCommitDate().equals(LocalDateTime.now().toLocalDate().atStartOfDay())) {
+				todayCommitCount = lastCommit.getCnt(); //오늘 커밋 횟수 업데이트
+			}
+		}
+
 
 		if (lastCommitDate != null && lastCommitDate.isBefore(LocalDateTime.now().minusDays(1))) {
 			consecutiveDays = 0;//마지막 커밋날짜가 어제보다 이전이면 연속 커밋 일수 초기화
