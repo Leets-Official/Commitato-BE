@@ -32,6 +32,9 @@ public class SecurityConfig {
 	@Value("${management.endpoints.web.base-path}")
 	private String actuatorEndPoint;
 
+	@Value("${server.url}")
+	private String serverUrl;
+
 	private String[] getAuthWhitelist() {
 		return new String[] {
 			"/error",
@@ -57,7 +60,7 @@ public class SecurityConfig {
 			)
 			.csrf(AbstractHttpConfigurer::disable)
 			.formLogin((formLogin) -> formLogin
-				.loginPage("/login/github"))
+				.loginPage(serverUrl + "/login/github"))
 			.authorizeHttpRequests((authorize) ->
 				authorize
 					.requestMatchers("/commit/**", "/user/update/exp-tier").authenticated()
