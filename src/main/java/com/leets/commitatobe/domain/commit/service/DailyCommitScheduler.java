@@ -24,7 +24,7 @@ public class DailyCommitScheduler {
 	private final ExpService expService;
 	private final AuthService authService;
 
-	@Scheduled(cron = "0 10 23 * * *")
+	@Scheduled(cron = "0 55 23 * * *")
 	@Transactional
 	public void updateAllUsersCommits() {
 		List<User> users = userRepository.findAll();
