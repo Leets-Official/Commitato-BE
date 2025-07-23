@@ -24,7 +24,7 @@ public class DailyCommitScheduler {
 	private final ExpService expService;
 	private final AuthService authService;
 
-	@Scheduled(cron = "0 55 23 * * *")
+	@Scheduled(cron = "0 15 23 * * *")
 	@Transactional
 	public void updateAllUsersCommits() {
 		List<User> users = userRepository.findAll();
@@ -38,7 +38,7 @@ public class DailyCommitScheduler {
 				time = user.getCreatedAt().toLocalDate().atStartOfDay();
 			}
 
-			LocalDateTime since = time;
+			LocalDateTime since = time.minusHours(9);
 			gitHubService.fetchRepos(user.getGithubId())
 				.forEach(name ->
 					gitHubService.countCommits(name, user.getGithubId(), since));
