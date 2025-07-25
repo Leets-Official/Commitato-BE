@@ -7,14 +7,13 @@ import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 
-import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
+import com.leets.commitatobe.domain.auth.service.AuthQueryService;
 import com.leets.commitatobe.domain.commit.domain.Commit;
 import com.leets.commitatobe.domain.commit.dto.response.ExpAndTierResponse;
 import com.leets.commitatobe.domain.commit.repository.CommitRepository;
-import com.leets.commitatobe.domain.auth.service.AuthQueryService;
 import com.leets.commitatobe.domain.tier.domain.Tier;
 import com.leets.commitatobe.domain.tier.repository.TierRepository;
 import com.leets.commitatobe.domain.user.domain.User;
@@ -64,14 +63,21 @@ public class ExpService {
 			lastCommitDate = commitDate;//마지막 커밋날짜를 현재 커밋날짜로 업데이트
 		}
 
-		if(!commits.isEmpty()){
+		LocalDateTime today = LocalDate.now().atStartOfDay();
+		LocalDateTime midnight = today.minusHours(9);
+		int newCommitCount = commits.stream()
+			.filter(c -> !c.getCommitDate().isBefore(midnight))
+			.mapToInt(Commit::getCnt)
+			.sum();
+
+		int todayCount = user.getTodayCommitCount() + newCommitCount;
+		/*if(!commits.isEmpty()){
 			Commit lastCommit = commits.get(commits.size() - 1);
 
 			if (lastCommit.getCommitDate().equals(LocalDateTime.now().toLocalDate().atStartOfDay())) {
 				todayCommitCount = lastCommit.getCnt(); //오늘 커밋 횟수 업데이트
 			}
-		}
-
+		}*/
 
 		if (lastCommitDate != null && lastCommitDate.isBefore(LocalDateTime.now().minusDays(1))) {
 			consecutiveDays = 0;//마지막 커밋날짜가 어제보다 이전이면 연속 커밋 일수 초기화
@@ -82,7 +88,7 @@ public class ExpService {
 		user.updateTier(tier);
 		user.updateConsecutiveCommitDays(consecutiveDays);
 		user.updateTotalCommitCount(totalCommitCount);
-		user.updateTodayCommitCount(todayCommitCount);
+		user.updateTodayCommitCount(todayCount);
 
 		commitRepository.saveAll(commits);//변경된 커밋 정보 데이터베이스에 저장
 		userRepository.save(user);//변경된 사용자 정보 데이터베이스에 저장
