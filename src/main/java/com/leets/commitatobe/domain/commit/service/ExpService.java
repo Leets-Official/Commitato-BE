@@ -55,7 +55,6 @@ public class ExpService {
 			consecutiveDays = updateConsecutiveDays(lastCommitDate, commitDate, consecutiveDays);
 
 			totalExp += commit.calculateExp(DAILY_BONUS_EXP, consecutiveDays, BONUS_EXP_INCREASE);//총 경험치 업데이트
-			//			totalCommitCount += commit.getCnt();//총 커밋 횟수
 
 			commit.markAsCalculated();//커밋 계산 여부를 true로 해서 다음 게산에서 제외
 			lastCommitDate = commitDate;//마지막 커밋날짜를 현재 커밋날짜로 업데이트
