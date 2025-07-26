@@ -62,7 +62,7 @@ public class ExpService {
 
 		LocalDateTime today = LocalDate.now().atStartOfDay(); // 오늘 자정
 		LocalDateTime midnight = today.minusHours(9); // UTC와 KST 시간 차이를 맞추기 위함
-		int newCommitCount = commits.stream()
+		int todayCommitCount = commits.stream()
 			.filter(c -> !c.getCommitDate().isBefore(midnight))
 			.mapToInt(Commit::getCnt)
 			.sum();
@@ -80,7 +80,7 @@ public class ExpService {
 		user.updateTier(tier);
 		user.updateConsecutiveCommitDays(consecutiveDays);
 		user.updateTotalCommitCount(totalCommitCount);
-		user.updateTodayCommitCount(newCommitCount);
+		user.updateTodayCommitCount(todayCommitCount);
 
 		commitRepository.saveAll(commits);//변경된 커밋 정보 데이터베이스에 저장
 		userRepository.save(user);//변경된 사용자 정보 데이터베이스에 저장
