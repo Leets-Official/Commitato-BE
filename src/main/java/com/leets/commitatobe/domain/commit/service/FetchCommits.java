@@ -48,7 +48,7 @@ public class FetchCommits {
 			List<String> repos = gitHubService.fetchRepos(gitHubId);
 			ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 			List<CompletableFuture<Void>> futures = new ArrayList<>();
-			LocalDateTime finalDateTime = dateTime.minusHours(9);
+			LocalDateTime finalDateTime = dateTime.minusHours(9); //UTC와 KST 시간 차이를 맞추기 위함.
 
 			for (String fullName : repos) {
 				CompletableFuture<Void> voidCompletableFuture = CompletableFuture.runAsync(() -> {
@@ -80,7 +80,7 @@ public class FetchCommits {
 		for (Map.Entry<LocalDateTime, Integer> entry : gitHubService.getCommitsByDate().entrySet()) {
 			Commit commit = commitRepository.findByCommitDateAndUser(entry.getKey(), user)
 				.orElse(Commit.create(entry.getKey(), 0, user));
-			commit.updateCnt(entry.getValue());
+			commit.updateCnt(entry.getValue() + commit.getCnt());
 			commitRepository.save(commit);
 		}
 	}
