@@ -7,14 +7,13 @@ import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 
-import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
+import com.leets.commitatobe.domain.auth.service.AuthQueryService;
 import com.leets.commitatobe.domain.commit.domain.Commit;
 import com.leets.commitatobe.domain.commit.dto.response.ExpAndTierResponse;
 import com.leets.commitatobe.domain.commit.repository.CommitRepository;
-import com.leets.commitatobe.domain.auth.service.AuthQueryService;
 import com.leets.commitatobe.domain.tier.domain.Tier;
 import com.leets.commitatobe.domain.tier.repository.TierRepository;
 import com.leets.commitatobe.domain.user.domain.User;
@@ -45,8 +44,6 @@ public class ExpService {
 		int consecutiveDays = user.getConsecutiveCommitDays(); //연속 커밋 일수
 		LocalDateTime lastCommitDate = null; //마지막 커밋 날짜
 		int totalExp = user.getExp(); //사용자의 현재 경험치
-		int totalCommitCount = user.getTotalCommitCount(); //총 커밋 횟수
-		int todayCommitCount = 0;
 
 		for (Commit commit : commits) {//각 커밋을 반복해서 계산
 			if (commit.isCalculated()) {
@@ -58,20 +55,21 @@ public class ExpService {
 			consecutiveDays = updateConsecutiveDays(lastCommitDate, commitDate, consecutiveDays);
 
 			totalExp += commit.calculateExp(DAILY_BONUS_EXP, consecutiveDays, BONUS_EXP_INCREASE);//총 경험치 업데이트
-			totalCommitCount += commit.getCnt();//총 커밋 횟수
 
 			commit.markAsCalculated();//커밋 계산 여부를 true로 해서 다음 게산에서 제외
 			lastCommitDate = commitDate;//마지막 커밋날짜를 현재 커밋날짜로 업데이트
 		}
 
-		if(!commits.isEmpty()){
-			Commit lastCommit = commits.get(commits.size() - 1);
+		LocalDateTime today = LocalDate.now().atStartOfDay(); // 오늘 자정
+		LocalDateTime midnight = today.minusHours(9); // UTC와 KST 시간 차이를 맞추기 위함
+		int todayCommitCount = commits.stream()
+			.filter(c -> !c.getCommitDate().isBefore(midnight))
+			.mapToInt(Commit::getCnt)
+			.sum();
 
-			if (lastCommit.getCommitDate().equals(LocalDateTime.now().toLocalDate().atStartOfDay())) {
-				todayCommitCount = lastCommit.getCnt(); //오늘 커밋 횟수 업데이트
-			}
-		}
-
+		int totalCommitCount = commits.stream()
+			.mapToInt(Commit::getCnt)
+			.sum();
 
 		if (lastCommitDate != null && lastCommitDate.isBefore(LocalDateTime.now().minusDays(1))) {
 			consecutiveDays = 0;//마지막 커밋날짜가 어제보다 이전이면 연속 커밋 일수 초기화
