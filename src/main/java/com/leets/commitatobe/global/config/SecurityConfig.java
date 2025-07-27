@@ -80,7 +80,10 @@ public class SecurityConfig {
 		configuration.setAllowedOrigins(Arrays.asList(
 			"http://localhost:3000",
 			"https://commitato.site",
-			"https://www.commitato.site"));
+			"https://www.commitato.site",
+			"https://commitato.com",
+			"https://www.commitato.com"
+		));
 		configuration.setAllowedMethods(Arrays.asList("HEAD", "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
 		configuration.setAllowCredentials(true);
 		configuration.setAllowedHeaders(List.of("*"));
