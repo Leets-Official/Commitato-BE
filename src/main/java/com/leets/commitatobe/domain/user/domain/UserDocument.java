@@ -19,6 +19,7 @@ public class UserDocument {
 
 	@Field(type = FieldType.Keyword)
 	private String githubId;
+
 	private String tierName;
 
 	private Integer ranking;
