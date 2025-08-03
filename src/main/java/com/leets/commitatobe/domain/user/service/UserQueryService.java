@@ -66,9 +66,6 @@ public class UserQueryService {
 
 	public List<UserDocument> searchUsers(String githubId) {
 		indexUsers();
-		if (githubId.contains("-")) {
-			return userSearchRepository.findByGithubIdStartingWith(githubId);
-		}
 		return userSearchRepository.findByGithubIdContaining(githubId);
 	}
 
