@@ -1,0 +1,10 @@
+{
+  "analysis": {
+    "analyzer": {
+      "hyphen_preserving": {
+        "tokenizer": "whitespace",
+        "filter": ["lowercase"]
+      }
+    }
+  }
+}
