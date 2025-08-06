@@ -27,7 +27,7 @@ spring:
 
   sql:
     init:
-      mode: always
+      mode: never
 
   security:
     oauth2:
