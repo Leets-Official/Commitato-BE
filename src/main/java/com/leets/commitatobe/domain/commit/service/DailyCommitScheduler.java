@@ -22,9 +22,8 @@ public class DailyCommitScheduler {
 	private final GitHubService gitHubService;
 	private final CommitRepository commitRepository;
 	private final ExpService expService;
-	private final AuthService authService;
 
-	@Scheduled(cron = "0 03 22 * * *")
+	@Scheduled(cron = "0 30 06 * * *")
 	@Transactional
 	public void updateAllUsersCommits() {
 		gitHubService.disableAuth();
