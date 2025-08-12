@@ -92,10 +92,6 @@ public class GitHubService {
 
 		JsonArray contributors = getConnection("/repos/" + fullName + "/contributors");
 
-		// if (contributors == null) {
-		// 	return false;
-		// }
-
 		for (int i = 0; i < contributors.size(); i++) {
 			JsonObject contributor = contributors.get(i).getAsJsonObject();
 
@@ -161,26 +157,8 @@ public class GitHubService {
 
 	// http 연결
 	private JsonArray getConnection(String url) {
-		/*Mono<JsonArray> response = webClient.get()
-			.uri(url)
-			.header(HttpHeaders.AUTHORIZATION, "Bearer " + AUTH_TOKEN)
-			.retrieve()
-			.onStatus(status -> status == HttpStatus.UNAUTHORIZED, clientResponse ->
-				// AUTH_TOKEN이 유효하지 않으면 리다이렉트
-				webClient.get()
-					.uri(SERVER_URI + "/login/github")
-					.retrieve()
-					.bodyToMono(Void.class)
-					.then(Mono.error(new RuntimeException("Unauthorized")))
-			)
-			.bodyToMono(String.class)
-			.map(res -> JsonParser.parseString(res).getAsJsonArray());
-
-		return response.block();*/
-
 		WebClient.RequestHeadersSpec<?> req = webClient.get().uri(url);
 		if (useAuth && AUTH_TOKEN != null && !AUTH_TOKEN.isBlank()) {
-			// GitHub OAuth/PAT는 관례적으로 "token <...>"
 			req = req.header(HttpHeaders.AUTHORIZATION, "Bearer " + AUTH_TOKEN);
 		}
 
