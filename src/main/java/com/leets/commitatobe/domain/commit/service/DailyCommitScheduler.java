@@ -24,15 +24,14 @@ public class DailyCommitScheduler {
 	private final ExpService expService;
 	private final AuthService authService;
 
-	@Scheduled(cron = "0 30 06 * * *")
+	@Scheduled(cron = "0 03 22 * * *")
 	@Transactional
 	public void updateAllUsersCommits() {
+		gitHubService.disableAuth();
+
 		List<User> users = userRepository.findAll();
 
 		for (User user : users) {
-			String token = authService.decrypt(user.getGitHubAccessToken());
-			gitHubService.updateToken(token);
-
 			LocalDateTime time = user.getLastCommitUpdateTime();
 			if (time == null) {
 				time = user.getCreatedAt().toLocalDate().atStartOfDay();

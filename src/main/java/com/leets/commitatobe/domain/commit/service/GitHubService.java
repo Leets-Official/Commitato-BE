@@ -36,6 +36,7 @@ import reactor.core.publisher.Mono;
 public class GitHubService {
 	private final String GITHUB_API_URL = "https://api.github.com";
 	private String AUTH_TOKEN;
+	private boolean useAuth = false;
 	private final Map<LocalDateTime, Integer> commitsByDate = new HashMap<>();
 	private final WebClient webClient = WebClient.builder()
 		.baseUrl(GITHUB_API_URL)
@@ -49,16 +50,27 @@ public class GitHubService {
 	@Value("${server-uri}")
 	private String SERVER_URI;
 
+	public void enableAuth(String accessToken) {
+		this.AUTH_TOKEN = accessToken;
+		this.useAuth = (accessToken != null && !accessToken.isBlank());
+	}
+
+	public void disableAuth() {
+		this.AUTH_TOKEN = null;
+		this.useAuth = false;
+	}
+
 	// GitHub repository 이름 저장
 	public List<String> fetchRepos(String gitHubUsername) {
 		commitsByDate.clear();
 
+		String path = useAuth
+			? "/user/repos?type=all&sort=pushed&per_page=100"
+			: "/users/" + gitHubUsername + "/repos?type=public&sort=pushed&per_page=100";
+
 		Set<String> repoFullNames = new HashSet<>();
 
-		JsonArray repos = getConnection("/user/repos?type=all&sort=pushed&per_page=100");
-		if (repos == null) {
-			return new ArrayList<>();
-		}
+		JsonArray repos = getConnection(path);
 
 		repos.forEach(repo -> {
 			String fullName = repo.getAsJsonObject().get("full_name").getAsString();
@@ -80,9 +92,9 @@ public class GitHubService {
 
 		JsonArray contributors = getConnection("/repos/" + fullName + "/contributors");
 
-		if (contributors == null) {
-			return false;
-		}
+		// if (contributors == null) {
+		// 	return false;
+		// }
 
 		for (int i = 0; i < contributors.size(); i++) {
 			JsonObject contributor = contributors.get(i).getAsJsonObject();
@@ -149,7 +161,7 @@ public class GitHubService {
 
 	// http 연결
 	private JsonArray getConnection(String url) {
-		Mono<JsonArray> response = webClient.get()
+		/*Mono<JsonArray> response = webClient.get()
 			.uri(url)
 			.header(HttpHeaders.AUTHORIZATION, "Bearer " + AUTH_TOKEN)
 			.retrieve()
@@ -164,7 +176,32 @@ public class GitHubService {
 			.bodyToMono(String.class)
 			.map(res -> JsonParser.parseString(res).getAsJsonArray());
 
-		return response.block();
+		return response.block();*/
+
+		WebClient.RequestHeadersSpec<?> req = webClient.get().uri(url);
+		if (useAuth && AUTH_TOKEN != null && !AUTH_TOKEN.isBlank()) {
+			// GitHub OAuth/PAT는 관례적으로 "token <...>"
+			req = req.header(HttpHeaders.AUTHORIZATION, "Bearer " + AUTH_TOKEN);
+		}
+
+		// 상태코드에 따라 처리 (스케줄러 무인증 모드에서 401/403이면 빈 배열로 처리)
+		String body = req.exchangeToMono(resp -> {
+			if (resp.statusCode().is2xxSuccessful()) {
+				return resp.bodyToMono(String.class);
+			}
+			// 무인증 모드(스케줄러)에서 접근 불가면 빈 결과로
+			if (!useAuth && (resp.statusCode().value() == 401 || resp.statusCode().value() == 403)) {
+				return Mono.just("[]");
+			}
+			// 그 외에는 에러 노출
+			return resp.bodyToMono(String.class)
+				.defaultIfEmpty("")
+				.flatMap(b -> Mono.error(new RuntimeException("GitHub API " + resp.statusCode() + " " + b)));
+		}).block();
+
+		return body == null || body.isBlank()
+			? new JsonArray()
+			: JsonParser.parseString(body).getAsJsonArray();
 	}
 
 	private boolean validateAuthor(JsonObject commitJson, String gitHubUsername) {
@@ -200,6 +237,6 @@ public class GitHubService {
 
 	// GitHub Access Token 저장
 	public void updateToken(String accessToken) {
-		this.AUTH_TOKEN = accessToken;
+		enableAuth(accessToken);
 	}
 }
