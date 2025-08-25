@@ -7,6 +7,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.leets.commitatobe.domain.auth.service.AuthService;
 import com.leets.commitatobe.domain.commit.domain.Commit;
 import com.leets.commitatobe.domain.commit.repository.CommitRepository;
 import com.leets.commitatobe.domain.user.domain.User;
@@ -21,15 +22,17 @@ public class DailyCommitScheduler {
 	private final GitHubService gitHubService;
 	private final CommitRepository commitRepository;
 	private final ExpService expService;
+	private final AuthService authService;
 
 	@Scheduled(cron = "0 30 06 * * *")
 	@Transactional
 	public void updateAllUsersCommits() {
-		gitHubService.disableAuth();
-
 		List<User> users = userRepository.findAll();
 
 		for (User user : users) {
+			String token = authService.decrypt(user.getGitHubAccessToken());
+			gitHubService.updateToken(token);
+
 			LocalDateTime time = user.getLastCommitUpdateTime();
 			if (time == null) {
 				time = user.getCreatedAt().toLocalDate().atStartOfDay();
