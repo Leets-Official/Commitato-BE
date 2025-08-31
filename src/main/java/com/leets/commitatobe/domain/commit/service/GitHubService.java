@@ -25,7 +25,6 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.leets.commitatobe.global.exception.GithubUnauthorizedException;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
