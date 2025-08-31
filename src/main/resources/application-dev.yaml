@@ -1,5 +1,9 @@
 spring:
   data:
+    redis:
+      host: http://129.154.60.190
+      port: 6379
+      password: ${REDIS_PW}
     elasticsearch:
       repositories:
         enabled: true
