@@ -1,6 +1,8 @@
 package com.leets.commitatobe.domain.auth.controller;
 
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -10,6 +12,7 @@ import com.leets.commitatobe.domain.auth.dto.GithubToken;
 import com.leets.commitatobe.domain.auth.dto.LoginResponse;
 import com.leets.commitatobe.domain.auth.service.AuthService;
 import com.leets.commitatobe.domain.auth.service.AuthQueryService;
+import com.leets.commitatobe.domain.auth.service.GithubTokenService;
 import com.leets.commitatobe.domain.user.service.UserQueryService;
 import com.leets.commitatobe.global.jwt.service.CustomOAuth2UserService;
 import com.leets.commitatobe.global.response.ApiResponse;
@@ -70,5 +73,15 @@ public class AuthController {
 		String gitHubAccessToken = userQueryService.getUserGitHubAccessToken(user.userId());
 		log.info("깃허브 엑세스 토큰: {}", authService.encrypt(gitHubAccessToken));
 		return ApiResponse.onSuccess(user);
+	}
+
+	// 1) access만 깨뜨리기
+	private final GithubTokenService githubTokenService;
+	@PostMapping("/invalidate-access")
+	public ApiResponse<String> invalidateAccess(String githubId) {
+		String refresh = githubTokenService.getDecryptedRefreshToken(githubId)
+			.orElseThrow(() -> new RuntimeException("No refresh token."));
+		githubTokenService.saveTokens(githubId, new GithubToken("invalid_access_token", refresh));
+		return ApiResponse.onSuccess("성공");
 	}
 }
