@@ -3,6 +3,10 @@ spring:
     elasticsearch:
       repositories:
         enabled: true
+    redis:
+      host: localhost
+      port: 6379
+      password: 6316
   elasticsearch:
     uris: http://localhost:9200
   application:
