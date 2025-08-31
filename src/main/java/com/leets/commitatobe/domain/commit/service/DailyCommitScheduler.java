@@ -7,6 +7,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.leets.commitatobe.domain.auth.dto.GithubToken;
 import com.leets.commitatobe.domain.auth.service.GithubTokenService;
 import com.leets.commitatobe.domain.commit.domain.Commit;
 import com.leets.commitatobe.domain.commit.repository.CommitRepository;
@@ -26,14 +27,27 @@ public class DailyCommitScheduler {
 	private final ExpService expService;
 	private final GithubTokenService githubTokenService;
 
-	@Scheduled(cron = "0 30 06 * * *")
+	@Scheduled(cron = "0 04 02 * * *")
 	@Transactional
 	public void updateAllUsersCommits() {
 		List<User> users = userRepository.findAll();
 
 		for (User user : users) {
+			try{
+				tryCommitUpdate(user);
+			}catch (RuntimeException e){
+				GithubToken newToken = githubTokenService.updateAccessTokenByRefreshToken(user.getGithubId());
+				gitHubService.updateToken(newToken.accessToken());
+
+				tryCommitUpdate(user);
+			}
+		}
+	}
+
+	private void tryCommitUpdate(User user){
+		gitHubService.runWithoutRedirect(()->{
 			String token = githubTokenService.getDecryptedAccessToken(user.getGithubId())
-					.orElseThrow(()-> new ApiException(ErrorStatus._UNAUTHORIZED));
+				.orElseThrow(()->new ApiException(ErrorStatus._UNAUTHORIZED));
 			gitHubService.updateToken(token);
 
 			LocalDateTime time = user.getLastCommitUpdateTime();
@@ -59,6 +73,6 @@ public class DailyCommitScheduler {
 			userRepository.save(user);
 
 			expService.calculateAndSaveExp(user.getGithubId());
-		}
+		});
 	}
 }
