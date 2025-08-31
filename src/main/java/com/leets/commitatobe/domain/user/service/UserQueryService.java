@@ -11,7 +11,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.leets.commitatobe.domain.auth.service.AuthService;
+import com.leets.commitatobe.domain.auth.service.GithubTokenService;
 import com.leets.commitatobe.domain.commit.domain.Commit;
 import com.leets.commitatobe.domain.commit.repository.CommitRepository;
 import com.leets.commitatobe.domain.tier.domain.Tier;
@@ -35,8 +35,8 @@ import lombok.RequiredArgsConstructor;
 public class UserQueryService {
 	private final UserRepository userRepository;
 	private final CommitRepository commitRepository;
-	private final AuthService authService;
 	private final UserSearchRepository userSearchRepository;
+	private final GithubTokenService githubTokenService;
 
 	private User getUser(String githubId) {
 		return userRepository.findByGithubId(githubId)
@@ -101,10 +101,8 @@ public class UserQueryService {
 	}
 
 	public String getUserGitHubAccessToken(String githubId) {
-		User user = getUser(githubId);
-		String gitHubAccessToken = user.getGitHubAccessToken();
-
-		return authService.decrypt(gitHubAccessToken);
+		return githubTokenService.getDecryptedAccessToken(githubId)
+			.orElseThrow(()-> new ApiException(_UNAUTHORIZED));
 	}
 
 	public UserInfoResponse findUserInfo(String githubId, String myGitHubId) {

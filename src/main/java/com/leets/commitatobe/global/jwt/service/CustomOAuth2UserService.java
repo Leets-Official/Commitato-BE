@@ -20,7 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.leets.commitatobe.domain.auth.dto.GithubToken;
 import com.leets.commitatobe.domain.auth.dto.LoginResponse;
-import com.leets.commitatobe.domain.auth.service.AuthService;
 import com.leets.commitatobe.domain.auth.service.GithubTokenService;
 import com.leets.commitatobe.domain.tier.domain.Tier;
 import com.leets.commitatobe.domain.tier.repository.TierRepository;
@@ -49,9 +48,6 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 	private final UserRepository userRepository;
 
 	private final TierRepository tierRepository;
-
-	@Autowired
-	private AuthService authService;
 
 	private final GithubTokenService githubTokenService;
 
@@ -99,8 +95,6 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
 		User user = userWithStatus.getFirst();
 		boolean isNewUser = userWithStatus.getSecond();
-
-		user.updateGitHubAccessToken(authService.encrypt(token.accessToken()));
 
 		userRepository.save(user);
 

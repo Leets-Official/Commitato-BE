@@ -31,7 +31,6 @@ public class AuthController {
 	private final AuthService authService;
 	private final AuthQueryService authQueryService;
 	private final UserQueryService userQueryService;
-
 	private final CustomOAuth2UserService customOAuth2UserService;
 
 	@Operation(
@@ -69,7 +68,7 @@ public class AuthController {
 	public ApiResponse<GitHubDto> test() {
 		GitHubDto user = authQueryService.getGitHubUser();
 		String gitHubAccessToken = userQueryService.getUserGitHubAccessToken(user.userId());
-		log.info("깃허브 엑세스 토큰: {}", gitHubAccessToken);
+		log.info("깃허브 엑세스 토큰: {}", authService.encrypt(gitHubAccessToken));
 		return ApiResponse.onSuccess(user);
 	}
 }
