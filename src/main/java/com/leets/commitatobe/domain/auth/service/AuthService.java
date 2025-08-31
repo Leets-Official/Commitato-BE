@@ -102,6 +102,39 @@ public class AuthService {
 		}
 	}
 
+	public GithubToken refreshAccessToken(String refreshToken) {
+		WebClient webClient = WebClient.builder()
+			.baseUrl("https://github.com")
+			.defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+			.defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
+			.build();
+
+		String responseBody = webClient.post()
+			.uri("/login/oauth/access_token")
+			.bodyValue("client_id=" + clientId +
+				"&client_secret=" + clientSecret +
+				"&grant_type=refresh_token" +
+				"&refresh_token=" + refreshToken)
+			.retrieve()
+			.bodyToMono(String.class)
+			.block();
+
+		String newAccessToken;
+		String newRefreshToken;
+		try {
+			ObjectMapper mapper = new ObjectMapper();
+			Map<String, Object> resultMap = mapper.readValue(responseBody, Map.class);
+
+			newAccessToken = (String)resultMap.get("access_token");
+			newRefreshToken = (String)resultMap.get("refresh_token");
+
+		} catch (Exception e) {
+			throw new ApiException(_GITHUB_JSON_PARSING_ERROR);
+		}
+
+		return new GithubToken(newAccessToken, newRefreshToken);
+	}
+
 	public String encrypt(String token) {
 		byte[] encrypted;
 		try {

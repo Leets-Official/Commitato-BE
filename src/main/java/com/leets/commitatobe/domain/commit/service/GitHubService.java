@@ -25,6 +25,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.leets.commitatobe.global.exception.GithubUnauthorizedException;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +38,7 @@ public class GitHubService {
 	private final String GITHUB_API_URL = "https://api.github.com";
 	private String AUTH_TOKEN;
 	private final Map<LocalDateTime, Integer> commitsByDate = new HashMap<>();
+	private static final ThreadLocal<Boolean> REDIRECT_ON_401 = ThreadLocal.withInitial(() -> true);
 	private final WebClient webClient = WebClient.builder()
 		.baseUrl(GITHUB_API_URL)
 		.defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED_VALUE)
@@ -149,17 +151,25 @@ public class GitHubService {
 
 	// http 연결
 	private JsonArray getConnection(String url) {
+		boolean redirect = REDIRECT_ON_401.get();
+
 		Mono<JsonArray> response = webClient.get()
 			.uri(url)
 			.header(HttpHeaders.AUTHORIZATION, "Bearer " + AUTH_TOKEN)
 			.retrieve()
 			.onStatus(status -> status == HttpStatus.UNAUTHORIZED, clientResponse ->
-				// AUTH_TOKEN이 유효하지 않으면 리다이렉트
-				webClient.get()
-					.uri(SERVER_URI + "/login/github")
-					.retrieve()
-					.bodyToMono(Void.class)
-					.then(Mono.error(new RuntimeException("Unauthorized")))
+				{
+					if (redirect) {
+						// AUTH_TOKEN이 유효하지 않으면 리다이렉트
+						return webClient.get()
+							.uri(SERVER_URI + "/login/github")
+							.retrieve()
+							.bodyToMono(Void.class)
+							.then(Mono.error(new RuntimeException("Unauthorized")));
+					} else {
+						return Mono.error(new RuntimeException("Unauthorized"));
+					}
+				}
 			)
 			.bodyToMono(String.class)
 			.map(res -> JsonParser.parseString(res).getAsJsonArray());
@@ -201,5 +211,27 @@ public class GitHubService {
 	// GitHub Access Token 저장
 	public void updateToken(String accessToken) {
 		this.AUTH_TOKEN = accessToken;
+	}
+
+	public <T> T runWithoutRedirect(java.util.concurrent.Callable<T> work) {
+		boolean prev = REDIRECT_ON_401.get();
+		REDIRECT_ON_401.set(false);
+		try {
+			return work.call();
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		} finally {
+			REDIRECT_ON_401.set(prev);
+		}
+	}
+
+	public void runWithoutRedirect(Runnable work) {
+		boolean prev = REDIRECT_ON_401.get();
+		REDIRECT_ON_401.set(false);
+		try {
+			work.run();
+		} finally {
+			REDIRECT_ON_401.set(prev);
+		}
 	}
 }
