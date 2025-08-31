@@ -18,8 +18,10 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.leets.commitatobe.domain.auth.dto.GithubToken;
 import com.leets.commitatobe.domain.auth.dto.LoginResponse;
 import com.leets.commitatobe.domain.auth.service.AuthService;
+import com.leets.commitatobe.domain.auth.service.GithubTokenService;
 import com.leets.commitatobe.domain.tier.domain.Tier;
 import com.leets.commitatobe.domain.tier.repository.TierRepository;
 import com.leets.commitatobe.domain.user.domain.User;
@@ -51,7 +53,9 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 	@Autowired
 	private AuthService authService;
 
-	public LoginResponse generateJwt(String gitHubAccessToken) {
+	private final GithubTokenService githubTokenService;
+
+	public LoginResponse generateJwt(GithubToken token) {
 		ClientRegistration clientRegistration = ClientRegistration.withRegistrationId("github")
 			.clientId(clientId)
 			.clientSecret(clientSecret)
@@ -65,11 +69,11 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
 		OAuth2UserRequest userRequest = new OAuth2UserRequest(
 			clientRegistration,
-			new OAuth2AccessToken(OAuth2AccessToken.TokenType.BEARER, gitHubAccessToken, Instant.now(),
+			new OAuth2AccessToken(OAuth2AccessToken.TokenType.BEARER, token.accessToken(), Instant.now(),
 				Instant.now().plusSeconds(3600))
 		);
 
-		return loadUserAndJwt(userRequest, gitHubAccessToken);
+		return loadUserAndJwt(userRequest, token);
 	}
 
 	public OAuth2User loadUser(OAuth2UserRequest userRequest) throws OAuth2AuthenticationException {
@@ -82,7 +86,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
 	}
 
-	public LoginResponse loadUserAndJwt(OAuth2UserRequest userRequest, String gitHubAccessToken) throws
+	public LoginResponse loadUserAndJwt(OAuth2UserRequest userRequest, GithubToken token) throws
 		OAuth2AuthenticationException {
 		OAuth2User oAuth2User = loadUser(userRequest);
 		String githubId = oAuth2User.getAttribute("login");
@@ -96,9 +100,11 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 		User user = userWithStatus.getFirst();
 		boolean isNewUser = userWithStatus.getSecond();
 
-		user.updateGitHubAccessToken(authService.encrypt(gitHubAccessToken));
+		user.updateGitHubAccessToken(authService.encrypt(token.accessToken()));
 
 		userRepository.save(user);
+
+		githubTokenService.saveTokens(githubId, token);
 
 		return LoginResponse.of(isNewUser, jwt);
 	}
@@ -107,7 +113,8 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 		String githubId = oAuth2User.getAttribute("login");
 		String username = oAuth2User.getAttribute("name");
 		String profileImage = oAuth2User.getAttribute("avatar_url");
-		Tier tier = tierRepository.findByRequiredExp(0).orElseThrow(() -> new IllegalStateException("기본 티어를 찾을 수 없습니다."));
+		Tier tier = tierRepository.findByRequiredExp(0)
+			.orElseThrow(() -> new IllegalStateException("기본 티어를 찾을 수 없습니다."));
 
 		User user = User.builder()
 			.githubId(githubId)

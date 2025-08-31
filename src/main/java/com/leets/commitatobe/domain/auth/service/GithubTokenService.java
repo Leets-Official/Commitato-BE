@@ -4,7 +4,7 @@ import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
-import com.leets.commitatobe.domain.auth.dto.GithubAuthToken;
+import com.leets.commitatobe.domain.auth.dto.GithubToken;
 import com.leets.commitatobe.domain.token.entity.GithubTokenRedis;
 import com.leets.commitatobe.domain.token.repository.GithubTokenRedisRepository;
 
@@ -16,7 +16,7 @@ public class GithubTokenService {
 	private final GithubTokenRedisRepository githubTokenRedisRepository;
 	private final AuthService authService;
 
-	public void saveTokens(String githubId, GithubAuthToken token) {
+	public void saveTokens(String githubId, GithubToken token) {
 		GithubTokenRedis tokenRedis = GithubTokenRedis.builder()
 			.githubId(githubId)
 			.accessToken(authService.encrypt(token.accessToken()))

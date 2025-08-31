@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.leets.commitatobe.domain.auth.dto.GitHubDto;
+import com.leets.commitatobe.domain.auth.dto.GithubToken;
 import com.leets.commitatobe.domain.auth.dto.LoginResponse;
 import com.leets.commitatobe.domain.auth.service.AuthService;
 import com.leets.commitatobe.domain.auth.service.AuthQueryService;
@@ -54,9 +55,9 @@ public class AuthController {
 	)
 	@GetMapping("/callback")
 	public ApiResponse<LoginResponse> githubCallback(@RequestParam("code") String code, HttpServletResponse response) {
-		String gitHubAccessToken = authService.gitHubLogin(code);
+		GithubToken token = authService.gitHubLogin(code);
 
-		LoginResponse loginResponse = customOAuth2UserService.generateJwt(gitHubAccessToken);
+		LoginResponse loginResponse = customOAuth2UserService.generateJwt(token);
 
 		response.setHeader("Authentication", "Bearer " + loginResponse.jwtResponse().accessToken());
 
