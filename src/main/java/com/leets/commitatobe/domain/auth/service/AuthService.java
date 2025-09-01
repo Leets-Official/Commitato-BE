@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.leets.commitatobe.domain.auth.dto.GithubToken;
 import com.leets.commitatobe.global.exception.ApiException;
 
 import jakarta.servlet.http.HttpServletResponse;
@@ -49,7 +50,7 @@ public class AuthService {
 	@Value("${jwt.iv-secret}")
 	private String ivSecret;
 
-	public String gitHubLogin(String authCode) {
+	public GithubToken gitHubLogin(String authCode) {
 		WebClient webClient = WebClient.builder()
 			.baseUrl("https://github.com")
 			.defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED_VALUE)
@@ -72,11 +73,14 @@ public class AuthService {
 
 		// JSON 형식의 응답 파싱
 		String accessToken;
+		String refreshToken;
 
 		try {
 			ObjectMapper mapper = new ObjectMapper();
 			Map<String, String> resultMap = mapper.readValue(responseBody, Map.class);
+
 			accessToken = resultMap.get("access_token");
+			refreshToken = resultMap.get("refresh_token");
 		} catch (Exception e) {
 			throw new ApiException(_GITHUB_JSON_PARSING_ERROR);
 		}
@@ -85,7 +89,7 @@ public class AuthService {
 			throw new ApiException(_GITHUB_TOKEN_GENERATION_ERROR);
 		}
 
-		return accessToken;
+		return new GithubToken(accessToken, refreshToken);
 	}
 
 	public void redirect(HttpServletResponse response) {
@@ -96,6 +100,39 @@ public class AuthService {
 		} catch (Exception e) {
 			throw new ApiException(_REDIRECT_ERROR);
 		}
+	}
+
+	public GithubToken refreshAccessToken(String refreshToken) {
+		WebClient webClient = WebClient.builder()
+			.baseUrl("https://github.com")
+			.defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+			.defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
+			.build();
+
+		String responseBody = webClient.post()
+			.uri("/login/oauth/access_token")
+			.bodyValue("client_id=" + clientId +
+				"&client_secret=" + clientSecret +
+				"&grant_type=refresh_token" +
+				"&refresh_token=" + refreshToken)
+			.retrieve()
+			.bodyToMono(String.class)
+			.block();
+
+		String newAccessToken;
+		String newRefreshToken;
+		try {
+			ObjectMapper mapper = new ObjectMapper();
+			Map<String, Object> resultMap = mapper.readValue(responseBody, Map.class);
+
+			newAccessToken = (String)resultMap.get("access_token");
+			newRefreshToken = (String)resultMap.get("refresh_token");
+
+		} catch (Exception e) {
+			throw new ApiException(_GITHUB_JSON_PARSING_ERROR);
+		}
+
+		return new GithubToken(newAccessToken, newRefreshToken);
 	}
 
 	public String encrypt(String token) {

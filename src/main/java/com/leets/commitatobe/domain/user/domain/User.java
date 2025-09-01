@@ -31,9 +31,6 @@ public class User extends BaseTimeEntity {
 	private UUID id;
 
 	@Column
-	private String gitHubAccessToken;
-
-	@Column
 	private String username;
 
 	@Column(nullable = false)
@@ -68,6 +65,13 @@ public class User extends BaseTimeEntity {
 	@Column
 	private LocalDateTime lastCommitUpdateTime;
 
+	@Column
+	private LocalDateTime lastLoginAt;
+
+	@Column
+	@Builder.Default
+	private Boolean isHumanAccount = false;
+
 	public void updateExp(Integer exp) {
 		this.exp = exp;
 	}
@@ -96,7 +100,15 @@ public class User extends BaseTimeEntity {
 		this.lastCommitUpdateTime = lastCommitUpdateTime;
 	}
 
-	public void updateGitHubAccessToken(String gitHubAccessToken) {
-		this.gitHubAccessToken = gitHubAccessToken;
+	public void updateLastLoginAt(LocalDateTime loginAt) {
+		this.lastLoginAt = loginAt;
+	}
+
+	public void changeHumanAccount() {
+		this.isHumanAccount = true;
+	}
+
+	public void reactivateAccount(){
+		this.isHumanAccount = false;
 	}
 }
