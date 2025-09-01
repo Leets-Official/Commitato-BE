@@ -3,7 +3,7 @@ spring:
     redis:
       host: http://129.154.60.190
       port: 6379
-      password: ${REDIS_PW}
+      password: ENC(1m0y2/95BrgZWhuFGWmG8A==)
     elasticsearch:
       repositories:
         enabled: true

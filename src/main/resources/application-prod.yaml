@@ -6,7 +6,7 @@ spring:
     redis:
       host: http://3.36.120.171
       port: 6379
-      password: ${REDIS_PW}
+      password: ENC(1m0y2/95BrgZWhuFGWmG8A==)
   elasticsearch:
     uris: ENC(c4D0381DRDiy6fOYvGdITd7tcIKeXOaybB0UnUU6UQPfHbQ7hUqlkA==)
   application:
