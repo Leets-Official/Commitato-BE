@@ -65,6 +65,10 @@ public class User extends BaseTimeEntity {
 	@Column
 	private LocalDateTime lastCommitUpdateTime;
 
+	@Column
+	@Builder.Default
+	private Boolean isHumanAccount = false;
+
 	public void updateExp(Integer exp) {
 		this.exp = exp;
 	}

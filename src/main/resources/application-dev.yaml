@@ -1,7 +1,7 @@
 spring:
   data:
     redis:
-      host: http://129.154.60.190
+      host: ENC(GrnLD8+oXmSy05oqfa9KX6fzTrXUNoyFWtPSwQCFSRI=)
       port: 6379
       password: ENC(1m0y2/95BrgZWhuFGWmG8A==)
     elasticsearch:

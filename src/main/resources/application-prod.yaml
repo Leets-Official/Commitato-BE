@@ -4,7 +4,7 @@ spring:
       repositories:
         enabled: true
     redis:
-      host: http://3.36.120.171
+      host: ENC(iQuxAbBIc01YiZQiQ5MfUz57e9YeKZJkr1hA+ikyais=)
       port: 6379
       password: ENC(1m0y2/95BrgZWhuFGWmG8A==)
   elasticsearch:
