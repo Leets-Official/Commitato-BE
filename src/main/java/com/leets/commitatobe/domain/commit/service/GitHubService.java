@@ -26,7 +26,6 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.leets.commitatobe.global.exception.ApiException;
-import com.leets.commitatobe.global.response.ApiResponse;
 import com.leets.commitatobe.global.response.code.status.ErrorStatus;
 
 import lombok.Getter;
