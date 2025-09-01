@@ -29,7 +29,7 @@ public class DailyCommitScheduler {
 	private final ExpService expService;
 	private final GithubTokenService githubTokenService;
 
-	@Scheduled(cron = "0 30 06 * * *")
+	@Scheduled(cron = "0 28 15 * * *")
 	@Transactional
 	public void updateAllUsersCommits() {
 		List<User> users = userRepository.findAllByIsHumanAccountFalse();
@@ -44,7 +44,7 @@ public class DailyCommitScheduler {
 			}
 			try {
 				tryCommitUpdate(user);
-			} catch (RuntimeException e) {
+			} catch (ApiException e) {
 				GithubToken newToken = githubTokenService.updateAccessTokenByRefreshToken(user.getGithubId());
 				gitHubService.updateToken(newToken.accessToken());
 

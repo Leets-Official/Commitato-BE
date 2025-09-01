@@ -25,6 +25,9 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.leets.commitatobe.global.exception.ApiException;
+import com.leets.commitatobe.global.response.ApiResponse;
+import com.leets.commitatobe.global.response.code.status.ErrorStatus;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -164,9 +167,9 @@ public class GitHubService {
 							.uri(SERVER_URI + "/login/github")
 							.retrieve()
 							.bodyToMono(Void.class)
-							.then(Mono.error(new RuntimeException("Unauthorized")));
+							.then(Mono.error(new ApiException(ErrorStatus._UNAUTHORIZED)));
 					} else {
-						return Mono.error(new RuntimeException("Unauthorized"));
+						return Mono.error(new ApiException(ErrorStatus._UNAUTHORIZED));
 					}
 				}
 			)
