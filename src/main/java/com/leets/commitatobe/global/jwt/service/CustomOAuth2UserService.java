@@ -1,6 +1,8 @@
 package com.leets.commitatobe.global.jwt.service;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Collections;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -95,6 +97,11 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
 		User user = userWithStatus.getFirst();
 		boolean isNewUser = userWithStatus.getSecond();
+
+		user.updateLastLoginAt(LocalDateTime.now());
+		if (user.getIsHumanAccount() == true) {
+			user.reactivateAccount();
+		}
 
 		userRepository.save(user);
 

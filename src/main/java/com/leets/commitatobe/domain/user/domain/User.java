@@ -66,6 +66,9 @@ public class User extends BaseTimeEntity {
 	private LocalDateTime lastCommitUpdateTime;
 
 	@Column
+	private LocalDateTime lastLoginAt;
+
+	@Column
 	@Builder.Default
 	private Boolean isHumanAccount = false;
 
@@ -95,5 +98,17 @@ public class User extends BaseTimeEntity {
 
 	public void updateLastCommitUpdateTime(LocalDateTime lastCommitUpdateTime) {
 		this.lastCommitUpdateTime = lastCommitUpdateTime;
+	}
+
+	public void updateLastLoginAt(LocalDateTime loginAt) {
+		this.lastLoginAt = loginAt;
+	}
+
+	public void changeHumanAccount() {
+		this.isHumanAccount = true;
+	}
+
+	public void reactivateAccount(){
+		this.isHumanAccount = false;
 	}
 }

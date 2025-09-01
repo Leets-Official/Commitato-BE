@@ -21,6 +21,8 @@ import lombok.RequiredArgsConstructor;
 @Component
 @RequiredArgsConstructor
 public class DailyCommitScheduler {
+	private static final long SIX_MONTHS = 6L;
+
 	private final UserRepository userRepository;
 	private final GitHubService gitHubService;
 	private final CommitRepository commitRepository;
@@ -30,12 +32,19 @@ public class DailyCommitScheduler {
 	@Scheduled(cron = "0 30 06 * * *")
 	@Transactional
 	public void updateAllUsersCommits() {
-		List<User> users = userRepository.findAll();
+		List<User> users = userRepository.findAllByIsHumanAccountFalse();
+
+		LocalDateTime afterHalfYear = LocalDateTime.now().minusMonths(SIX_MONTHS);
 
 		for (User user : users) {
-			try{
+			if (user.getLastLoginAt() != null && !user.getLastLoginAt().isAfter(afterHalfYear)) {
+				user.changeHumanAccount();
+				userRepository.save(user);
+				continue;
+			}
+			try {
 				tryCommitUpdate(user);
-			}catch (RuntimeException e){
+			} catch (RuntimeException e) {
 				GithubToken newToken = githubTokenService.updateAccessTokenByRefreshToken(user.getGithubId());
 				gitHubService.updateToken(newToken.accessToken());
 
@@ -44,10 +53,10 @@ public class DailyCommitScheduler {
 		}
 	}
 
-	private void tryCommitUpdate(User user){
-		gitHubService.runWithoutRedirect(()->{
+	private void tryCommitUpdate(User user) {
+		gitHubService.runWithoutRedirect(() -> {
 			String token = githubTokenService.getDecryptedAccessToken(user.getGithubId())
-				.orElseThrow(()->new ApiException(ErrorStatus._UNAUTHORIZED));
+				.orElseThrow(() -> new ApiException(ErrorStatus._UNAUTHORIZED));
 			gitHubService.updateToken(token);
 
 			LocalDateTime time = user.getLastCommitUpdateTime();

@@ -1,5 +1,6 @@
 package com.leets.commitatobe.domain.user.repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -15,4 +16,5 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 	//경험치순으로 유저를 페이징하여 조회하는 메서드
 	Page<User> findAllByOrderByExpDesc(Pageable pageable);
 
+	List<User> findAllByIsHumanAccountFalse();
 }
