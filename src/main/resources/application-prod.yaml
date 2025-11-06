@@ -28,6 +28,7 @@ spring:
         use_sql_comments: false
         show_sql: false
     defer-datasource-initialization: true
+    open-in-view: false
 
   sql:
     init:
