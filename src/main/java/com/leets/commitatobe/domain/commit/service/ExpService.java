@@ -18,6 +18,7 @@ import com.leets.commitatobe.domain.tier.domain.Tier;
 import com.leets.commitatobe.domain.tier.repository.TierRepository;
 import com.leets.commitatobe.domain.user.domain.User;
 import com.leets.commitatobe.domain.user.repository.UserRepository;
+import com.leets.commitatobe.global.config.redis.annotation.RedissonLock;
 import com.leets.commitatobe.global.exception.ApiException;
 import com.leets.commitatobe.global.response.code.status.ErrorStatus;
 
@@ -36,6 +37,7 @@ public class ExpService {
 	private static final int DAILY_BONUS_EXP = 100;
 	private static final int BONUS_EXP_INCREASE = 10;
 
+	@RedissonLock(key = "#githubId")
 	public void calculateAndSaveExp(String githubId) {
 		User user = userRepository.findByGithubId(githubId)
 			.orElseThrow(() -> new UsernameNotFoundException("해당하는 깃허브 닉네임과 일치하는 유저를 찾을 수 없음: " + githubId));

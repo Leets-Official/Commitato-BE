@@ -1,7 +1,7 @@
 spring:
   data:
     redis:
-      host: ENC(GrnLD8+oXmSy05oqfa9KX6fzTrXUNoyFWtPSwQCFSRI=)
+      host: ENC(H1yL45jyqj3P+KDUXri+PZoccCwhIm1X)
       port: 6379
       password: ENC(MsGQ3SkxHLyEBmLod9HUSYKYd/gJFA1q)
     elasticsearch:
@@ -28,6 +28,7 @@ spring:
         use_sql_comments: false
         show_sql: false
     defer-datasource-initialization: true
+    open-in-view: false
 
   sql:
     init:

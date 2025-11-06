@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import com.leets.commitatobe.global.config.redis.annotation.RedissonLock;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.leets.commitatobe.domain.user.domain.User;
@@ -19,6 +20,7 @@ public class RankingScheduler {
 
 	@Scheduled(cron = "0 30 0/3 * * *")
 	@Transactional
+	@RedissonLock(key = "'user-ranking-update'", leaseTime = 600L)
 	public void updateUserRankings() {
 		List<User> allUsers = userRepository.findAllByOrderByExpDesc(Pageable.unpaged()).getContent();
 
