@@ -5,6 +5,7 @@ import java.util.List;
 
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import com.leets.commitatobe.global.config.redis.annotation.RedissonLock;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.leets.commitatobe.domain.auth.dto.GithubToken;
@@ -31,6 +32,7 @@ public class DailyCommitScheduler {
 
 	@Scheduled(cron = "0 30 06 * * *")
 	@Transactional
+	@RedissonLock(key = "'commit-update-scheduler'", leaseTime = 600L)
 	public void updateAllUsersCommits() {
 		List<User> users = userRepository.findAllByIsHumanAccountFalse();
 
