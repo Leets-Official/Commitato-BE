@@ -1,0 +1,50 @@
+spring:
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: test
+  application:
+    name: commitato-BE
+
+  jpa:
+    hibernate:
+      ddl-auto: create
+    defer-datasource-initialization: true
+
+  sql:
+    init:
+      mode: always
+
+  security:
+    oauth2:
+      client:
+        registration:
+          github:
+            client-id: test
+            client-secret: test
+            redirect-uri: http://test:8080/login
+
+jwt:
+  secret: testsecretkeytestsecretkeytestsecretkeytestsecretkeytestsecretkeytest
+  aes-secret: test
+  iv-secret: test
+
+management:
+  endpoints:
+    enabled-by-default: false
+    web:
+      exposure:
+        include: health
+      base-path: /test
+    jmx:
+      exposure:
+        exclude: "*"
+  endpoint:
+    health:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+server-uri: http://test:8080
