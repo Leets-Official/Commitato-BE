@@ -6,16 +6,13 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ForkJoinPool;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
@@ -37,9 +34,6 @@ import reactor.core.publisher.Mono;
 @Getter
 public class GitHubService {
 	private final String GITHUB_API_URL = "https://api.github.com";
-	private String AUTH_TOKEN;
-	private final Map<LocalDateTime, Integer> commitsByDate = new HashMap<>();
-	private static final ThreadLocal<Boolean> REDIRECT_ON_401 = ThreadLocal.withInitial(() -> true);
 	private final WebClient webClient = WebClient.builder()
 		.baseUrl(GITHUB_API_URL)
 		.defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED_VALUE)
@@ -49,16 +43,11 @@ public class GitHubService {
 			.build())
 		.build();
 
-	@Value("${server-uri}")
-	private String SERVER_URI;
-
 	// GitHub repository 이름 저장
-	public List<String> fetchRepos(String gitHubUsername) {
-		commitsByDate.clear();
-
+	public List<String> fetchRepos(String accessToken, String gitHubUsername) {
 		Set<String> repoFullNames = new HashSet<>();
 
-		JsonArray repos = getConnection("/user/repos?type=all&sort=pushed&per_page=100");
+		JsonArray repos = getConnection("/user/repos?type=all&sort=pushed&per_page=100", accessToken);
 		if (repos == null) {
 			return new ArrayList<>();
 		}
@@ -70,18 +59,73 @@ public class GitHubService {
 
 		return new ForkJoinPool(Runtime.getRuntime().availableProcessors()).submit(() ->
 			repoFullNames.parallelStream()
-				.filter(fullName -> isContributor(fullName, gitHubUsername))
+				.filter(fullName -> isContributor(accessToken, fullName, gitHubUsername))
 				.toList()
 		).join();
 	}
 
+	// commit을 일별로 정리
+	public void countCommits(String accessToken, String fullName, String gitHubUsername, LocalDateTime date,
+		Map<LocalDateTime, Integer> commitsByDate) {
+		int page = 1;
+		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
+		while (true) {
+			JsonArray commits;
+
+			try {
+				commits = getConnection(
+					"/repos/" + fullName + "/commits?page=" + page + "&per_page=100" + "&since=" + formatToISO8601(
+						date), accessToken);
+			} catch (Exception e) {
+				return;
+			}
+
+			if (commits == null || commits.isEmpty()) {
+				return;
+			}
+
+			for (int i = 0; i < commits.size(); i++) {
+				JsonObject commit = commits.get(i).getAsJsonObject();
+
+				if (!validateAuthor(commit, gitHubUsername)) {
+					continue;
+				}
+
+				String commitDateTime = getCommitDateTime(commit);
+				if (commitDateTime.length() < 10) {
+					continue;
+				}
+
+				LocalDateTime commitDate = LocalDate.parse(commitDateTime.substring(0, 10), formatter).atStartOfDay();
+				commitsByDate.merge(commitDate, 1, Integer::sum);
+			}
+
+			page++;
+		}
+	}
+
+	// http 연결
+	private JsonArray getConnection(String url, String accessToken) {
+		return webClient.get()
+			.uri(url)
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+			.retrieve()
+			.onStatus(s -> s.value() == 401,
+				r -> Mono.error(new ApiException(ErrorStatus._UNAUTHORIZED)))
+			.bodyToMono(String.class)
+			.map(res -> JsonParser.parseString(res).getAsJsonArray())
+			.block();
+	}
+
+
 	// 자신이 해당 repository의 기여자 인지 확인
-	private boolean isContributor(String fullName, String gitHubUsername) {
+	private boolean isContributor(String accessToken, String fullName, String gitHubUsername) {
 		if (fullName.contains(gitHubUsername)) {
 			return true;
 		}
 
-		JsonArray contributors = getConnection("/repos/" + fullName + "/contributors");
+		JsonArray contributors = getConnection("/repos/" + fullName + "/contributors", accessToken);
 
 		if (contributors == null) {
 			return false;
@@ -99,83 +143,6 @@ public class GitHubService {
 			}
 		}
 		return false;
-	}
-
-	// commit을 일별로 정리
-	public void countCommits(String fullName, String gitHubUsername, LocalDateTime date) {
-		int page = 1;
-		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-
-		while (true) {
-			JsonArray commits;
-
-			try {
-				commits = getConnection(
-					"/repos/" + fullName + "/commits?page=" + page + "&per_page=100" + "&since=" + formatToISO8601(
-						date));
-			} catch (Exception e) {
-				return;
-			}
-
-			if (commits == null || commits.isEmpty()) {
-				return;
-			}
-
-			for (int i = 0; i < commits.size(); i++) {
-				JsonObject commit = commits.get(i).getAsJsonObject();
-
-				// validateAuthor 메서드가 false, 즉 author가 null일 경우 스킵
-				if (!validateAuthor(commit, gitHubUsername)) {
-					continue;
-				}
-
-				String commitDateTime = getCommitDateTime(commit);
-				if (commitDateTime.length() < 10) {
-					continue;
-				}
-
-				int comparisonResult = commitDateTime.compareTo(formatToISO8601(date));
-				if (comparisonResult < 0) {
-					continue;
-				}
-
-				LocalDateTime commitDate = LocalDate.parse(commitDateTime.substring(0, 10), formatter).atStartOfDay();
-
-				synchronized (commitsByDate) {
-					commitsByDate.put(commitDate, commitsByDate.getOrDefault(commitDate, 0) + 1);
-				}
-			}
-
-			page++;
-		}
-	}
-
-	// http 연결
-	private JsonArray getConnection(String url) {
-		boolean redirect = REDIRECT_ON_401.get();
-
-		Mono<JsonArray> response = webClient.get()
-			.uri(url)
-			.header(HttpHeaders.AUTHORIZATION, "Bearer " + AUTH_TOKEN)
-			.retrieve()
-			.onStatus(status -> status == HttpStatus.UNAUTHORIZED, clientResponse ->
-				{
-					if (redirect) {
-						// AUTH_TOKEN이 유효하지 않으면 리다이렉트
-						return webClient.get()
-							.uri(SERVER_URI + "/login/github")
-							.retrieve()
-							.bodyToMono(Void.class)
-							.then(Mono.error(new ApiException(ErrorStatus._UNAUTHORIZED)));
-					} else {
-						return Mono.error(new ApiException(ErrorStatus._UNAUTHORIZED));
-					}
-				}
-			)
-			.bodyToMono(String.class)
-			.map(res -> JsonParser.parseString(res).getAsJsonArray());
-
-		return response.block();
 	}
 
 	private boolean validateAuthor(JsonObject commitJson, String gitHubUsername) {
@@ -207,32 +174,5 @@ public class GitHubService {
 	private String formatToISO8601(LocalDateTime dateTime) {
 		ZonedDateTime zonedDateTime = dateTime.atZone(ZoneOffset.UTC);
 		return DateTimeFormatter.ISO_INSTANT.format(zonedDateTime);
-	}
-
-	// GitHub Access Token 저장
-	public void updateToken(String accessToken) {
-		this.AUTH_TOKEN = accessToken;
-	}
-
-	public <T> T runWithoutRedirect(java.util.concurrent.Callable<T> work) {
-		boolean prev = REDIRECT_ON_401.get();
-		REDIRECT_ON_401.set(false);
-		try {
-			return work.call();
-		} catch (Exception e) {
-			throw new RuntimeException(e);
-		} finally {
-			REDIRECT_ON_401.set(prev);
-		}
-	}
-
-	public void runWithoutRedirect(Runnable work) {
-		boolean prev = REDIRECT_ON_401.get();
-		REDIRECT_ON_401.set(false);
-		try {
-			work.run();
-		} finally {
-			REDIRECT_ON_401.set(prev);
-		}
 	}
 }

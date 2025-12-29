@@ -2,10 +2,15 @@ package com.leets.commitatobe.domain.commit.service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+
 import com.leets.commitatobe.global.config.redis.annotation.RedissonLock;
+
 import org.springframework.transaction.annotation.Transactional;
 
 import com.leets.commitatobe.domain.auth.dto.GithubToken;
@@ -44,46 +49,50 @@ public class DailyCommitScheduler {
 				userRepository.save(user);
 				continue;
 			}
+
 			try {
 				tryCommitUpdate(user);
 			} catch (ApiException e) {
-				GithubToken newToken = githubTokenService.updateAccessTokenByRefreshToken(user.getGithubId());
-				gitHubService.updateToken(newToken.accessToken());
+				if (e.getErrorReasonHttpStatus().getHttpStatus() != HttpStatus.UNAUTHORIZED) {
+					throw e;
+				}
 
-				tryCommitUpdate(user);
+				GithubToken newToken = githubTokenService.updateAccessTokenByRefreshToken(user.getGithubId());
+				tryCommitUpdate(user, newToken.accessToken());
 			}
 		}
 	}
 
 	private void tryCommitUpdate(User user) {
-		gitHubService.runWithoutRedirect(() -> {
-			String token = githubTokenService.getDecryptedAccessToken(user.getGithubId())
-				.orElseThrow(() -> new ApiException(ErrorStatus._UNAUTHORIZED));
-			gitHubService.updateToken(token);
+		String accessToken = githubTokenService.getDecryptedAccessToken(user.getGithubId())
+			.orElseThrow(() -> new ApiException(ErrorStatus._UNAUTHORIZED));
+		tryCommitUpdate(user, accessToken);
+	}
 
-			LocalDateTime time = user.getLastCommitUpdateTime();
-			if (time == null) {
-				time = user.getCreatedAt().toLocalDate().atStartOfDay();
+	private void tryCommitUpdate(User user, String accessToken) {
+		LocalDateTime time = user.getLastCommitUpdateTime();
+		if (time == null) {
+			time = user.getCreatedAt().toLocalDate().atStartOfDay();
+		}
+
+		LocalDateTime since = time.minusHours(9);
+		Map<LocalDateTime, Integer> commitsByDate = new ConcurrentHashMap<>();
+
+		gitHubService.fetchRepos(accessToken, user.getGithubId())
+			.forEach(name ->
+				gitHubService.countCommits(accessToken, name, user.getGithubId(), since, commitsByDate));
+
+		commitsByDate.forEach((date, cnt) -> {
+				Commit commit = commitRepository.findByCommitDateAndUser(date, user)
+					.orElse(Commit.create(date, 0, user));
+				commit.updateCnt(commit.getCnt() + cnt);
+				commitRepository.save(commit);
 			}
+		);
 
-			LocalDateTime since = time.minusHours(9);
-			gitHubService.fetchRepos(user.getGithubId())
-				.forEach(name ->
-					gitHubService.countCommits(name, user.getGithubId(), since));
+		user.updateLastCommitUpdateTime(LocalDateTime.now());
+		userRepository.save(user);
 
-			gitHubService.getCommitsByDate().forEach((date, cnt) -> {
-					Commit commit = commitRepository
-						.findByCommitDateAndUser(date, user)
-						.orElse(Commit.create(date, 0, user));
-					commit.updateCnt(commit.getCnt() + cnt);
-					commitRepository.save(commit);
-				}
-			);
-
-			user.updateLastCommitUpdateTime(LocalDateTime.now());
-			userRepository.save(user);
-
-			expService.calculateAndSaveExp(user.getGithubId());
-		});
+		expService.calculateAndSaveExp(user.getGithubId());
 	}
 }

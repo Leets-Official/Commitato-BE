@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -43,28 +44,30 @@ public class FetchCommits {
 		}
 
 		try {
-			gitHubService.updateToken(userQueryService.getUserGitHubAccessToken(gitHubId));
+			String accessToken = userQueryService.getUserGitHubAccessToken(gitHubId);
 
-			List<String> repos = gitHubService.fetchRepos(gitHubId);
+			List<String> repos = gitHubService.fetchRepos(accessToken, gitHubId);
 			ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 			List<CompletableFuture<Void>> futures = new ArrayList<>();
 			LocalDateTime finalDateTime = dateTime.minusHours(9); //UTC와 KST 시간 차이를 맞추기 위함.
 
+			Map<LocalDateTime, Integer> commitsByDate = new ConcurrentHashMap<>();
+
 			for (String fullName : repos) {
 				CompletableFuture<Void> voidCompletableFuture = CompletableFuture.runAsync(() -> {
-					gitHubService.countCommits(fullName, gitHubId, finalDateTime);
+					gitHubService.countCommits(accessToken, fullName, gitHubId, finalDateTime, commitsByDate);
 				}, executor);
 				futures.add(voidCompletableFuture);
 			}
 
 			CompletableFuture<Void> allFutures = CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
 			allFutures.join();
-
 			executor.shutdown();
 
 			user.updateLastCommitUpdateTime(LocalDateTime.now());
+			userRepository.save(user);
 
-			saveCommits(user);
+			saveCommits(user, commitsByDate);
 
 			expService.calculateAndSaveExp(gitHubId);//커밋 가져온 후 경험치 계산 및 저장
 
@@ -75,9 +78,9 @@ public class FetchCommits {
 		return CommitResponse.of(true, user);
 	}
 
-	private void saveCommits(User user) {
+	private void saveCommits(User user, Map<LocalDateTime, Integer> commitsByDate) {
 		// 날짜별 커밋 수 DB에 저장
-		for (Map.Entry<LocalDateTime, Integer> entry : gitHubService.getCommitsByDate().entrySet()) {
+		for (Map.Entry<LocalDateTime, Integer> entry : commitsByDate.entrySet()) {
 			Commit commit = commitRepository.findByCommitDateAndUser(entry.getKey(), user)
 				.orElse(Commit.create(entry.getKey(), 0, user));
 			commit.updateCnt(entry.getValue() + commit.getCnt());
