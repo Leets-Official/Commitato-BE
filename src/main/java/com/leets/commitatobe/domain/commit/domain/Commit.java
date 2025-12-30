@@ -41,7 +41,7 @@ public class Commit extends BaseTimeEntity {
 	private User user;
 
 	@Column(name = "is_calculated")
-	private boolean isCalculated;//경험치 계산 여부를 나타낸다.
+	private boolean calculated;//경험치 계산 여부를 나타낸다.
 
 	public static Commit create(LocalDateTime commitDate, Integer cnt, User user) {
 		return Commit.builder()
@@ -66,11 +66,11 @@ public class Commit extends BaseTimeEntity {
 	}
 
 	public void markAsCalculated() {
-		isCalculated = true;
+		calculated = true;
 	}
 
 	public void markAsUncalculated() {
-		isCalculated = false;
+		calculated = false;
 	}
 
 	public int calculateExp(int dailyBonusExp, int consecutiveDays, int bonusExpIncrease) {

@@ -1,9 +1,9 @@
 package com.leets.commitatobe.domain.commit.service;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -118,7 +118,6 @@ public class GitHubService {
 			.block();
 	}
 
-
 	// 자신이 해당 repository의 기여자 인지 확인
 	private boolean isContributor(String accessToken, String fullName, String gitHubUsername) {
 		if (fullName.contains(gitHubUsername)) {
@@ -161,18 +160,17 @@ public class GitHubService {
 		String originCommitDateTime = commit.get("commit").getAsJsonObject() // UTC+0
 			.get("author").getAsJsonObject()
 			.get("date").getAsString();
+		Instant instant = Instant.parse(originCommitDateTime);
 
-		// 입력된 시간 문자열을 LocalDateTime으로 변환
-		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'");
-		LocalDateTime dateTime = LocalDateTime.parse(originCommitDateTime, formatter);
-
-		// 9시간 추가 -> UTC+9(한국 표준 시)
-		return dateTime.plusHours(9).format(formatter);
+		ZoneId kst = ZoneId.of("Asia/Seoul");
+		return instant.atZone(kst).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
 	}
 
 	// GitHub API에서 제공하는 시간 표현법으로 변환
 	private String formatToISO8601(LocalDateTime dateTime) {
-		ZonedDateTime zonedDateTime = dateTime.atZone(ZoneOffset.UTC);
-		return DateTimeFormatter.ISO_INSTANT.format(zonedDateTime);
+		ZoneId kst = ZoneId.of("Asia/Seoul");
+		Instant instant = dateTime.atZone(kst).toInstant();
+
+		return DateTimeFormatter.ISO_INSTANT.format(instant);
 	}
 }

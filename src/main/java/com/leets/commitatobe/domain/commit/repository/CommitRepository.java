@@ -17,6 +17,8 @@ public interface CommitRepository extends JpaRepository<Commit, UUID> {
 
 	Optional<Commit> findByCommitDateAndUser(LocalDateTime commitDate, User user);
 
+	Optional<Commit> findTopByUserAndCalculatedIsTrueOrderByUpdatedAtDesc(User user);
+
 	List<Commit> findAllByUserOrderByCommitDateAsc(User user);
 
 	@Query("SELECT c FROM commit c " +

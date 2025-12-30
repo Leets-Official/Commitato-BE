@@ -37,11 +37,14 @@ public class FetchCommits {
 		User user = userRepository.findByGithubId(gitHubId)
 			.orElseThrow(() -> new UsernameNotFoundException("해당하는 깃허브 닉네임과 일치하는 유저를 찾을 수 없음: " + gitHubId));
 
-		LocalDateTime dateTime = user.getLastCommitUpdateTime();
+		LocalDateTime calculatedCursor = commitRepository.findTopByUserAndCalculatedIsTrueOrderByUpdatedAtDesc(user)
+			.map(Commit::getUpdatedAt)
+			.orElseGet(() -> user.getCreatedAt().toLocalDate().atStartOfDay());
+		LocalDateTime lastCommitUpdateTime = user.getLastCommitUpdateTime();
 
-		if (dateTime == null) {
-			dateTime = user.getCreatedAt().toLocalDate().atStartOfDay();
-		}
+		LocalDateTime since = (lastCommitUpdateTime == null)
+			? calculatedCursor :
+			(lastCommitUpdateTime.isAfter(calculatedCursor) ? lastCommitUpdateTime : calculatedCursor);
 
 		try {
 			String accessToken = userQueryService.getUserGitHubAccessToken(gitHubId);
@@ -49,13 +52,12 @@ public class FetchCommits {
 			List<String> repos = gitHubService.fetchRepos(accessToken, gitHubId);
 			ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 			List<CompletableFuture<Void>> futures = new ArrayList<>();
-			LocalDateTime finalDateTime = dateTime.minusHours(9); //UTC와 KST 시간 차이를 맞추기 위함.
 
 			Map<LocalDateTime, Integer> commitsByDate = new ConcurrentHashMap<>();
 
 			for (String fullName : repos) {
 				CompletableFuture<Void> voidCompletableFuture = CompletableFuture.runAsync(() -> {
-					gitHubService.countCommits(accessToken, fullName, gitHubId, finalDateTime, commitsByDate);
+					gitHubService.countCommits(accessToken, fullName, gitHubId, since, commitsByDate);
 				}, executor);
 				futures.add(voidCompletableFuture);
 			}
@@ -79,11 +81,11 @@ public class FetchCommits {
 	}
 
 	private void saveCommits(User user, Map<LocalDateTime, Integer> commitsByDate) {
-		// 날짜별 커밋 수 DB에 저장
 		for (Map.Entry<LocalDateTime, Integer> entry : commitsByDate.entrySet()) {
-			Commit commit = commitRepository.findByCommitDateAndUser(entry.getKey(), user)
-				.orElse(Commit.create(entry.getKey(), 0, user));
-			commit.updateCnt(entry.getValue() + commit.getCnt());
+			LocalDateTime day = entry.getKey().toLocalDate().atStartOfDay();
+			int commitCounts = entry.getValue();
+
+			Commit commit = Commit.create(day, commitCounts, user);
 			commitRepository.save(commit);
 		}
 	}
