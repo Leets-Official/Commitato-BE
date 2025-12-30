@@ -11,7 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class AopForTransaction {
 
-	@Transactional(propagation = Propagation.REQUIRES_NEW)
+	@Transactional(propagation = Propagation.REQUIRED)
 	public Object proceed(final ProceedingJoinPoint joinPoint, String key) throws Throwable {
 		log.info("Lock 수행 : {}", key);
 		return joinPoint.proceed();

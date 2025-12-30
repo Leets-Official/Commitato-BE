@@ -35,7 +35,7 @@ public class DailyCommitScheduler {
 	private final ExpService expService;
 	private final GithubTokenService githubTokenService;
 
-	@Scheduled(cron = "0 30 06 * * *")
+	@Scheduled(cron = "0 59 19 * * *", zone = "Asia/Seoul")
 	@Transactional
 	@RedissonLock(key = "'commit-update-scheduler'", leaseTime = 600L)
 	public void updateAllUsersCommits() {
@@ -50,8 +50,11 @@ public class DailyCommitScheduler {
 				continue;
 			}
 
+			String accessToken = githubTokenService.getDecryptedAccessToken(user.getGithubId())
+				.orElseThrow(() -> new ApiException(ErrorStatus._UNAUTHORIZED));
+
 			try {
-				tryCommitUpdate(user);
+				tryCommitUpdate(user, accessToken);
 			} catch (ApiException e) {
 				if (e.getErrorReasonHttpStatus().getHttpStatus() != HttpStatus.UNAUTHORIZED) {
 					throw e;
@@ -63,19 +66,13 @@ public class DailyCommitScheduler {
 		}
 	}
 
-	private void tryCommitUpdate(User user) {
-		String accessToken = githubTokenService.getDecryptedAccessToken(user.getGithubId())
-			.orElseThrow(() -> new ApiException(ErrorStatus._UNAUTHORIZED));
-		tryCommitUpdate(user, accessToken);
-	}
-
 	private void tryCommitUpdate(User user, String accessToken) {
 		LocalDateTime time = user.getLastCommitUpdateTime();
 		if (time == null) {
 			time = user.getCreatedAt().toLocalDate().atStartOfDay();
 		}
+		LocalDateTime since = time;
 
-		LocalDateTime since = time.minusHours(9);
 		Map<LocalDateTime, Integer> commitsByDate = new ConcurrentHashMap<>();
 
 		gitHubService.fetchRepos(accessToken, user.getGithubId())
@@ -83,10 +80,8 @@ public class DailyCommitScheduler {
 				gitHubService.countCommits(accessToken, name, user.getGithubId(), since, commitsByDate));
 
 		commitsByDate.forEach((date, cnt) -> {
-				Commit commit = commitRepository.findByCommitDateAndUser(date, user)
-					.orElse(Commit.create(date, 0, user));
-				commit.updateCnt(commit.getCnt() + cnt);
-				commitRepository.save(commit);
+				LocalDateTime day = date.toLocalDate().atStartOfDay();
+				commitRepository.save(Commit.create(day, cnt, user));
 			}
 		);
 
