@@ -56,9 +56,8 @@ public class FetchCommits {
 			Map<LocalDateTime, Integer> commitsByDate = new ConcurrentHashMap<>();
 
 			for (String fullName : repos) {
-				CompletableFuture<Void> voidCompletableFuture = CompletableFuture.runAsync(() -> {
-					gitHubService.countCommits(accessToken, fullName, gitHubId, since, commitsByDate);
-				}, executor);
+				CompletableFuture<Void> voidCompletableFuture = CompletableFuture.runAsync(() ->
+					gitHubService.countCommits(accessToken, fullName, gitHubId, since, commitsByDate), executor);
 				futures.add(voidCompletableFuture);
 			}
 
