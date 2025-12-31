@@ -66,12 +66,9 @@ public class FetchCommits {
 			allFutures.join();
 			executor.shutdown();
 
-			user.updateLastCommitUpdateTime(LocalDateTime.now());
-			userRepository.save(user);
-
 			saveCommits(user, commitsByDate);
 
-			expService.calculateAndSaveExp(gitHubId);//커밋 가져온 후 경험치 계산 및 저장
+			expService.calculateExpAndTier(gitHubId);
 
 		} catch (Exception e) {
 			throw new RuntimeException(e);

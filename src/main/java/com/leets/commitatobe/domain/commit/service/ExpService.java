@@ -20,7 +20,6 @@ import com.leets.commitatobe.domain.user.domain.User;
 import com.leets.commitatobe.domain.user.repository.UserRepository;
 import com.leets.commitatobe.global.config.redis.annotation.RedissonLock;
 import com.leets.commitatobe.global.exception.ApiException;
-import com.leets.commitatobe.global.response.code.status.ErrorStatus;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -34,79 +33,115 @@ public class ExpService {
 	private final TierRepository tierRepository;
 	private final AuthQueryService authQueryService;
 
+	private static final int POINT_PER_COMMIT = 10;
 	private static final int DAILY_BONUS_EXP = 100;
 	private static final int BONUS_EXP_INCREASE = 10;
 
 	@RedissonLock(key = "#githubId")
-	public void calculateAndSaveExp(String githubId) {
+	public void calculateExpAndTier(String githubId) {
 		User user = userRepository.findByGithubId(githubId)
 			.orElseThrow(() -> new UsernameNotFoundException("해당하는 깃허브 닉네임과 일치하는 유저를 찾을 수 없음: " + githubId));
-		List<Commit> commits = commitRepository.findAllByUserOrderByCommitDateAsc(user); //사용자의 모든 커밋을 날짜 오름차순으로 불러온다.
 
-		int consecutiveDays = user.getConsecutiveCommitDays(); //연속 커밋 일수
-		LocalDateTime lastCommitDate = null; //마지막 커밋 날짜
-		int totalExp = user.getExp(); //사용자의 현재 경험치
+		int updatedConsecutiveDays = updateConsecutiveDays(user);
 
-		for (Commit commit : commits) {//각 커밋을 반복해서 계산
-			if (commit.isCalculated()) {
-				continue; // 이미 계산된 커밋
-			}
+		List<Commit> uncalculatedCommits = commitRepository.findAllByUserAndCalculatedFalse(user);
+		int baseExp = calculateBaseExp(uncalculatedCommits);
+		int bonusExp = calculateTodayBonusExp(user, updatedConsecutiveDays);
+		int totalExp = user.getExp() + baseExp + bonusExp;
 
-			LocalDateTime commitDate = commit.getCommitDate();//커밋날짜를 가져와 시간 설정
+		int todayCommitCount = todayCommitCount(user);
+		int totalCommitCount = totalCommitCount(user);
 
-			consecutiveDays = updateConsecutiveDays(lastCommitDate, commitDate, consecutiveDays);
-
-			totalExp += commit.calculateExp(DAILY_BONUS_EXP, consecutiveDays, BONUS_EXP_INCREASE);//총 경험치 업데이트
-
-			commit.markAsCalculated();//커밋 계산 여부를 true로 해서 다음 게산에서 제외
-			lastCommitDate = commitDate;//마지막 커밋날짜를 현재 커밋날짜로 업데이트
-		}
-
-		LocalDateTime today = LocalDate.now().atStartOfDay(); // 오늘 자정
-		LocalDateTime midnight = today.minusHours(9); // UTC와 KST 시간 차이를 맞추기 위함
-		int todayCommitCount = commits.stream()
-			.filter(c -> !c.getCommitDate().isBefore(midnight))
-			.mapToInt(Commit::getCnt)
-			.sum();
-
-		int totalCommitCount = commits.stream()
-			.mapToInt(Commit::getCnt)
-			.sum();
-
-		if (lastCommitDate != null && lastCommitDate.isBefore(LocalDateTime.now().minusDays(1))) {
-			consecutiveDays = 0;//마지막 커밋날짜가 어제보다 이전이면 연속 커밋 일수 초기화
-		}
-
-		user.updateExp(totalExp);//사용자 경험치 업데이트
-		Tier tier = determineTier(user.getExp());//경험치에 따른 티어 결정
-		user.updateTier(tier);
-		user.updateConsecutiveCommitDays(consecutiveDays);
-		user.updateTotalCommitCount(totalCommitCount);
+		user.updateExp(totalExp);
+		user.updateTier(determineTier(totalExp));
+		user.updateConsecutiveCommitDays(updatedConsecutiveDays);
 		user.updateTodayCommitCount(todayCommitCount);
+		user.updateTotalCommitCount(totalCommitCount);
+		user.updateLastCommitUpdateTime(LocalDateTime.now());
 
-		commitRepository.saveAll(commits);//변경된 커밋 정보 데이터베이스에 저장
-		userRepository.save(user);//변경된 사용자 정보 데이터베이스에 저장
+		markCalculated(uncalculatedCommits);
+
+		userRepository.save(user);
 	}
 
-	private int updateConsecutiveDays(LocalDateTime lastCommitDate, LocalDateTime commitDate,
-		int currentConsecutiveDays) {
-		// 첫 커밋일 경우
-		if (lastCommitDate == null) {
+	private int updateConsecutiveDays(User user) {
+		LocalDateTime today = LocalDateTime.now().toLocalDate().atStartOfDay();
+		LocalDateTime yesterday = today.minusDays(1);
+
+		boolean hasTodayCommit = commitRepository.existsByUserAndCommitDate(user, today);
+		boolean hasYesterdayCommit = commitRepository.existsByUserAndCommitDate(user, yesterday);
+		if (!hasTodayCommit && !hasYesterdayCommit) {
+			return 0;
+		}
+
+		int currentConsecutiveDays = user.getConsecutiveCommitDays();
+
+		LocalDate lastCommitDay = commitRepository.findTopByUserAndCalculatedTrueOrderByCommitDateDesc(user)
+			.map(commitDate -> commitDate.getCommitDate().toLocalDate())
+			.orElse(null);
+
+		if (lastCommitDay == null) {
 			return 1;
 		}
-		LocalDate lastDate = lastCommitDate.toLocalDate();
-		LocalDate currentDate = commitDate.toLocalDate();
 
-		// 이전 커밋 날 + 하루 = 현재 커밋 날짜일 경우 연속 커밋 일수 + 1
-		if (currentDate.equals(lastDate.plusDays(1))) {
-			return currentConsecutiveDays + 1;
-		}
+		LocalDate recentCommitDay = commitRepository.findTopByUserOrderByCommitDateDesc(user)
+			.map(commitDate -> commitDate.getCommitDate().toLocalDate())
+			.orElse(null);
 
-		if (currentDate.equals(lastDate)) {
+		if (recentCommitDay != null && recentCommitDay.equals(lastCommitDay)) {
 			return currentConsecutiveDays;
 		}
 
+		if (recentCommitDay != null && recentCommitDay.equals(lastCommitDay.plusDays(1))) {
+			return currentConsecutiveDays + 1;
+		}
+
 		return 1;
+	}
+
+	private int calculateBaseExp(List<Commit> uncalculatedCommits) {
+		int commitCounts = uncalculatedCommits.stream()
+			.mapToInt(Commit::getCnt)
+			.sum();
+
+		return commitCounts * POINT_PER_COMMIT;
+	}
+
+	private int calculateTodayBonusExp(User user, int consecutiveDays) {
+		LocalDateTime today = LocalDate.now().atStartOfDay();
+
+		boolean alreadyGotBonusExpToday = commitRepository.existsByUserAndCommitDateAndCalculatedTrue(user, today);
+		if (alreadyGotBonusExpToday) {
+			return 0;
+		}
+
+		boolean hasNewCommitToday = commitRepository.existsByUserAndCommitDate(user, today);
+		if (!hasNewCommitToday) {
+			return 0;
+		}
+
+		return DAILY_BONUS_EXP + (BONUS_EXP_INCREASE * (consecutiveDays - 1));
+	}
+
+	private int todayCommitCount(User user) {
+		LocalDateTime today = LocalDate.now().atStartOfDay();
+
+		return commitRepository.findAllByUserAndCommitDate(user, today).stream()
+			.mapToInt(Commit::getCnt)
+			.sum();
+	}
+
+	private int totalCommitCount(User user) {
+		int currentTotalCommitCount = user.getTotalCommitCount();
+		int newCommitCount = commitRepository.findAllByUserAndCalculatedFalse(user).stream()
+			.mapToInt(Commit::getCnt)
+			.sum();
+
+		return currentTotalCommitCount + newCommitCount;
+	}
+
+	private void markCalculated(List<Commit> uncalculatedCommits) {
+		uncalculatedCommits.forEach(Commit::markAsCalculated);
 	}
 
 	private Tier determineTier(Integer exp) {
@@ -114,7 +149,7 @@ public class ExpService {
 			.stream()
 			.filter(tier -> tier.isValid(exp))
 			.max(Comparator.comparing(Tier::getRequiredExp))
-			.orElseThrow(() -> new ApiException(ErrorStatus._TIER_NOT_FOUND));
+			.orElseThrow(() -> new ApiException(_TIER_NOT_FOUND));
 	}
 
 	public ExpAndTierResponse updateExpAndTier(int exp) {

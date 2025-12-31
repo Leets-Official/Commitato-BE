@@ -35,7 +35,7 @@ public class DailyCommitScheduler {
 	private final ExpService expService;
 	private final GithubTokenService githubTokenService;
 
-	@Scheduled(cron = "0 59 19 * * *", zone = "Asia/Seoul")
+	@Scheduled(cron = "0 03 16 * * *", zone = "Asia/Seoul")
 	@Transactional
 	@RedissonLock(key = "'commit-update-scheduler'", leaseTime = 600L)
 	public void updateAllUsersCommits() {
@@ -85,9 +85,6 @@ public class DailyCommitScheduler {
 			}
 		);
 
-		user.updateLastCommitUpdateTime(LocalDateTime.now());
-		userRepository.save(user);
-
-		expService.calculateAndSaveExp(user.getGithubId());
+		expService.calculateExpAndTier(user.getGithubId());
 	}
 }
