@@ -1,5 +1,6 @@
 package com.leets.commitatobe.domain.user.domain;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -66,6 +67,9 @@ public class User extends BaseTimeEntity {
 	private LocalDateTime lastCommitUpdateTime;
 
 	@Column
+	private LocalDate lastCommitDateAppliedDate;
+
+	@Column
 	private LocalDateTime lastLoginAt;
 
 	@Column
@@ -98,6 +102,10 @@ public class User extends BaseTimeEntity {
 
 	public void updateLastCommitUpdateTime(LocalDateTime lastCommitUpdateTime) {
 		this.lastCommitUpdateTime = lastCommitUpdateTime;
+	}
+
+	public void updateLastCommitDateAppliedDate(LocalDate lastCommitDateAppliedDate) {
+		this.lastCommitDateAppliedDate = lastCommitDateAppliedDate;
 	}
 
 	public void updateLastLoginAt(LocalDateTime loginAt) {

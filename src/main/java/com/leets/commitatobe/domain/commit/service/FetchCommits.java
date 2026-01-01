@@ -29,7 +29,7 @@ public class FetchCommits {
 	private final UserRepository userRepository;
 	private final GitHubService gitHubService; // GitHub API 통신
 	private final AuthQueryService authQueryService;
-	private final ExpService expService;
+	private final CommitUpdateService commitUpdateService;
 	private final UserQueryService userQueryService;
 
 	public CommitResponse execute() {
@@ -49,7 +49,7 @@ public class FetchCommits {
 		try {
 			String accessToken = userQueryService.getUserGitHubAccessToken(gitHubId);
 
-			List<String> repos = gitHubService.fetchRepos(accessToken, gitHubId);
+			List<String> repos = gitHubService.fetchRepos(accessToken);
 			ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 			List<CompletableFuture<Void>> futures = new ArrayList<>();
 
@@ -65,24 +65,12 @@ public class FetchCommits {
 			allFutures.join();
 			executor.shutdown();
 
-			saveCommits(user, commitsByDate);
-
-			expService.calculateExpAndTier(gitHubId);
+			commitUpdateService.updateAndCalculate(user.getId(), commitsByDate);
 
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
 
 		return CommitResponse.of(true, user);
-	}
-
-	private void saveCommits(User user, Map<LocalDateTime, Integer> commitsByDate) {
-		for (Map.Entry<LocalDateTime, Integer> entry : commitsByDate.entrySet()) {
-			LocalDateTime day = entry.getKey().toLocalDate().atStartOfDay();
-			int commitCounts = entry.getValue();
-
-			Commit commit = Commit.create(day, commitCounts, user);
-			commitRepository.save(commit);
-		}
 	}
 }

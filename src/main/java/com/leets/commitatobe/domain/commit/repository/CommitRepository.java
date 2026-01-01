@@ -15,17 +15,17 @@ import com.leets.commitatobe.domain.user.domain.User;
 public interface CommitRepository extends JpaRepository<Commit, UUID> {
 	List<Commit> findAllByUserAndCalculatedFalse(User user);
 
+	List<Commit> findAllByUserAndCalculatedFalseOrderByCommitDateAsc(User user);
+
 	List<Commit> findAllByUserAndCommitDate(User user, LocalDateTime commitDate);
 
 	Optional<Commit> findTopByUserAndCalculatedIsTrueOrderByUpdatedAtDesc(User user);
 
 	Optional<Commit> findTopByUserOrderByCommitDateDesc(User user);
 
-	boolean existsByUserAndCommitDateAndCalculatedTrue(User user, LocalDateTime commitDate);
+	Optional<Commit> findByUserAndCommitDate(User user, LocalDateTime commitDate);
 
 	boolean existsByUserAndCommitDate(User user, LocalDateTime commitDate);
-
-	Optional<Commit> findTopByUserAndCalculatedTrueOrderByCommitDateDesc(User user);
 
 	@Query("SELECT c FROM commit c " +
 		"WHERE c.user = :user " +

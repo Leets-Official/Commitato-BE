@@ -35,7 +35,7 @@ public class DailyCommitScheduler {
 	private final ExpService expService;
 	private final GithubTokenService githubTokenService;
 
-	@Scheduled(cron = "0 03 16 * * *", zone = "Asia/Seoul")
+	@Scheduled(cron = "0 14 21 * * *", zone = "Asia/Seoul")
 	@Transactional
 	@RedissonLock(key = "'commit-update-scheduler'", leaseTime = 600L)
 	public void updateAllUsersCommits() {
@@ -75,15 +75,18 @@ public class DailyCommitScheduler {
 
 		Map<LocalDateTime, Integer> commitsByDate = new ConcurrentHashMap<>();
 
-		gitHubService.fetchRepos(accessToken, user.getGithubId())
+		gitHubService.fetchRepos(accessToken)
 			.forEach(name ->
 				gitHubService.countCommits(accessToken, name, user.getGithubId(), since, commitsByDate));
 
-		commitsByDate.forEach((date, cnt) -> {
-				LocalDateTime day = date.toLocalDate().atStartOfDay();
-				commitRepository.save(Commit.create(day, cnt, user));
-			}
-		);
+		commitsByDate.forEach((date, delta) -> {
+			LocalDateTime day = date.toLocalDate().atStartOfDay();
+			Commit commit = commitRepository.findByUserAndCommitDate(user, day)
+				.orElseGet(() -> Commit.create(day, 0, user));
+
+			commit.addCnt(delta);
+			commitRepository.save(commit);
+		});
 
 		expService.calculateExpAndTier(user.getGithubId());
 	}
