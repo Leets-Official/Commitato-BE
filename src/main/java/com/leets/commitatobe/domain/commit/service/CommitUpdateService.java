@@ -1,8 +1,12 @@
 package com.leets.commitatobe.domain.commit.service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,17 +33,25 @@ public class CommitUpdateService {
 	}
 
 	private void saveCommits(User user, Map<LocalDateTime, Integer> commitsByDate) {
+		if (commitsByDate.isEmpty()) return;
+
+		List<LocalDateTime> dates = new ArrayList<>(commitsByDate.keySet());
+		List<Commit> existingCommits = commitRepository.findAllByUserAndCommitDateIn(user, dates);
+
+		Map<LocalDateTime, Commit> commitMap = existingCommits.stream()
+			.collect(Collectors.toMap(Commit::getCommitDate, Function.identity()));
+
+		List<Commit> toSave = new ArrayList<>();
+
 		commitsByDate.forEach((date, newCnt) -> {
-			if (newCnt == null || newCnt <= 0) {
-				return;
-			}
-
+			if (newCnt <= 0) return;
 			LocalDateTime day = date.toLocalDate().atStartOfDay();
-			Commit commit = commitRepository.findByUserAndCommitDate(user, day)
-				.orElseGet(() -> Commit.create(day, 0, user));
 
+			Commit commit = commitMap.getOrDefault(day, Commit.create(day, 0, user));
 			commit.addCnt(newCnt);
-			commitRepository.save(commit);
+			toSave.add(commit);
 		});
+
+		commitRepository.saveAll(toSave);
 	}
 }
