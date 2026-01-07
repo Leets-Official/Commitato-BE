@@ -1,93 +1,62 @@
 package com.leets.commitatobe.domain.commit.service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
-import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import com.leets.commitatobe.global.config.redis.annotation.RedissonLock;
 
-import org.springframework.transaction.annotation.Transactional;
-
-import com.leets.commitatobe.domain.auth.dto.GithubToken;
-import com.leets.commitatobe.domain.auth.service.GithubTokenService;
-import com.leets.commitatobe.domain.commit.domain.Commit;
-import com.leets.commitatobe.domain.commit.repository.CommitRepository;
 import com.leets.commitatobe.domain.user.domain.User;
 import com.leets.commitatobe.domain.user.repository.UserRepository;
-import com.leets.commitatobe.global.exception.ApiException;
-import com.leets.commitatobe.global.response.code.status.ErrorStatus;
+import com.leets.commitatobe.global.executor.LogExecutionTime;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class DailyCommitScheduler {
 	private static final long SIX_MONTHS = 6L;
 
 	private final UserRepository userRepository;
-	private final GitHubService gitHubService;
-	private final CommitRepository commitRepository;
-	private final ExpService expService;
-	private final GithubTokenService githubTokenService;
+	private final CommitUpdateService commitUpdateService;
 
-	@Scheduled(cron = "0 14 21 * * *", zone = "Asia/Seoul")
-	@Transactional
+	private final ExecutorService executorService = Executors.newFixedThreadPool(10);
+
+	@Scheduled(cron = "0 04 13 * * *", zone = "Asia/Seoul")
 	@RedissonLock(key = "'commit-update-scheduler'", leaseTime = 600L)
+	@LogExecutionTime
 	public void updateAllUsersCommits() {
 		List<User> users = userRepository.findAllByIsHumanAccountFalse();
-
 		LocalDateTime afterHalfYear = LocalDateTime.now().minusMonths(SIX_MONTHS);
+
+		List<CompletableFuture<Void>> futures = new ArrayList<>();
 
 		for (User user : users) {
 			if (user.getLastLoginAt() != null && !user.getLastLoginAt().isAfter(afterHalfYear)) {
-				user.changeHumanAccount();
-				userRepository.save(user);
+				commitUpdateService.processHumanAccount(user.getId()); // 트랜잭션 분리
 				continue;
 			}
 
-			String accessToken = githubTokenService.getDecryptedAccessToken(user.getGithubId())
-				.orElseThrow(() -> new ApiException(ErrorStatus._UNAUTHORIZED));
-
-			try {
-				tryCommitUpdate(user, accessToken);
-			} catch (ApiException e) {
-				if (e.getErrorReasonHttpStatus().getHttpStatus() != HttpStatus.UNAUTHORIZED) {
-					throw e;
+			CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+				try {
+					commitUpdateService.schedulerUpdateUserCommit(user.getId());
+				} catch (Exception e) {
+					log.error("유저 {} 커밋 업데이트 실패", user.getGithubId(), e);
 				}
+			}, executorService);
 
-				GithubToken newToken = githubTokenService.updateAccessTokenByRefreshToken(user.getGithubId());
-				tryCommitUpdate(user, newToken.accessToken());
-			}
+			futures.add(future);
 		}
-	}
 
-	private void tryCommitUpdate(User user, String accessToken) {
-		LocalDateTime time = user.getLastCommitUpdateTime();
-		if (time == null) {
-			time = user.getCreatedAt().toLocalDate().atStartOfDay();
-		}
-		LocalDateTime since = time;
-
-		Map<LocalDateTime, Integer> commitsByDate = new ConcurrentHashMap<>();
-
-		gitHubService.fetchRepos(accessToken)
-			.forEach(name ->
-				gitHubService.countCommits(accessToken, name, user.getGithubId(), since, commitsByDate));
-
-		commitsByDate.forEach((date, delta) -> {
-			LocalDateTime day = date.toLocalDate().atStartOfDay();
-			Commit commit = commitRepository.findByUserAndCommitDate(user, day)
-				.orElseGet(() -> Commit.create(day, 0, user));
-
-			commit.addCnt(delta);
-			commitRepository.save(commit);
-		});
-
-		expService.calculateExpAndTier(user.getGithubId());
+		// 모든 작업이 끝날 때까지 대기
+		CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
 	}
 }
