@@ -6,8 +6,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
@@ -22,6 +20,7 @@ import com.leets.commitatobe.domain.user.domain.User;
 import com.leets.commitatobe.domain.user.repository.UserRepository;
 import com.leets.commitatobe.global.config.redis.annotation.RedissonLock;
 import com.leets.commitatobe.global.exception.ApiException;
+import com.leets.commitatobe.global.response.code.status.ErrorStatus;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -44,114 +43,147 @@ public class ExpService {
 		User user = userRepository.findByGithubId(githubId)
 			.orElseThrow(() -> new UsernameNotFoundException("해당하는 깃허브 닉네임과 일치하는 유저를 찾을 수 없음: " + githubId));
 
-		Set<LocalDate> commitDateSet = commitRepository.findAllCommitDatesByUser(user).stream()
-			.map(LocalDateTime::toLocalDate)
-			.collect(Collectors.toSet());
+		LocalDateTime now = LocalDateTime.now();
+		LocalDateTime lastUpdate = user.getLastCommitUpdateTime();
 
-		int updatedConsecutiveDays = updateConsecutiveDays(user, commitDateSet);
+		LocalDateTime windowStart = now.minusMonths(2).withDayOfMonth(1).toLocalDate().atStartOfDay();
 
-		List<Commit> uncalculatedCommits = commitRepository.findAllByUserAndCalculatedFalseOrderByCommitDateAsc(user);
-		int baseExp = calculateBaseExp(uncalculatedCommits);
-		int bonusExp = calculateTodayBonusExp(uncalculatedCommits, commitDateSet);
-		int totalExp = user.getExp() + baseExp + bonusExp;
+		List<Commit> windowCommits = commitRepository.findAllByUserAndCommitDateAfter(user,
+			windowStart.minusSeconds(1));
 
-		int todayCommitCount = todayCommitCount(user);
-		int totalCommitCount = totalCommitCount(user, uncalculatedCommits);
+		int calculatedWindowExp = calculateExpForCommits(windowCommits, user);
+		int calculatedWindowCommitCount = windowCommits.stream().mapToInt(Commit::getCnt).sum();
 
-		user.updateExp(totalExp);
-		user.updateTier(determineTier(totalExp));
-		user.updateConsecutiveCommitDays(updatedConsecutiveDays);
+		LocalDateTime nextDeductibleStart = now.minusMonths(1).withDayOfMonth(1).toLocalDate().atStartOfDay();
+		List<Commit> nextDeductibleCommits = windowCommits.stream()
+			.filter(c -> !c.getCommitDate().isBefore(nextDeductibleStart))
+			.toList();
+
+		int newNextMonthDeductibleExp = calculateExpForCommits(nextDeductibleCommits, user);
+		int newNextMonthDeductibleCommitCount = nextDeductibleCommits.stream().mapToInt(Commit::getCnt).sum();
+
+		int totalExp = user.getExp();
+		int totalCommitCount = user.getTotalCommitCount();
+
+		boolean isMonthChanged = lastUpdate != null && !lastUpdate.getMonth().equals(now.getMonth());
+
+		if (lastUpdate == null) {
+			totalExp += calculatedWindowExp;
+			totalCommitCount += calculatedWindowCommitCount;
+		} else if (isMonthChanged) {
+			totalExp = totalExp - user.getLastTwoMonthExp() + calculatedWindowExp;
+			totalCommitCount = totalCommitCount - user.getLastTwoMonthCommitCount() + calculatedWindowCommitCount;
+		} else {
+			totalExp = totalExp - user.getCurrentUpdateExp() + calculatedWindowExp;
+			totalCommitCount = totalCommitCount - user.getCurrentUpdateCommitCount() + calculatedWindowCommitCount;
+		}
+
+		int currentConsecutiveDays = calculateCurrentConsecutiveDays(user);
+		user.updateConsecutiveCommitDays(currentConsecutiveDays);
+
+		int todayCommitCount = windowCommits.stream()
+			.filter(commit -> commit.getCommitDate().toLocalDate().equals(now.toLocalDate()))
+			.mapToInt(Commit::getCnt)
+			.findFirst()
+			.orElse(0);
+
 		user.updateTodayCommitCount(todayCommitCount);
-		user.updateTotalCommitCount(totalCommitCount);
-		user.updateLastCommitUpdateTime(LocalDateTime.now());
+		user.updateExp(Math.max(0, totalExp));
+		user.updateTotalCommitCount(Math.max(0, totalCommitCount));
+		user.updateTier(determineTier(totalExp));
 
-		markCalculated(uncalculatedCommits);
+		user.updateCalcStats(
+			calculatedWindowExp,
+			calculatedWindowCommitCount,
+			newNextMonthDeductibleExp,
+			newNextMonthDeductibleCommitCount
+		);
+		user.updateLastCommitUpdateTime(now);
 
 		userRepository.save(user);
 	}
 
-	private int updateConsecutiveDays(User user, Set<LocalDate> commitDateSet) {
-		LocalDate today = LocalDate.now();
-		LocalDate yesterday = today.minusDays(1);
-
-		boolean hasTodayCommit = commitDateSet.contains(today);
-		boolean hasYesterdayCommit = commitDateSet.contains(yesterday);
-
-		if (!hasTodayCommit && !hasYesterdayCommit) {
-			user.updateLastCommitDateAppliedDate(null);
+	private int calculateExpForCommits(List<Commit> commits, User user) {
+		if (commits.isEmpty())
 			return 0;
-		}
 
-		LocalDate recentCommitDay = hasTodayCommit ? today : yesterday;
+		int baseExp = commits.stream()
+			.mapToInt(Commit::getCnt)
+			.sum() * POINT_PER_COMMIT;
 
-		int currentConsecutiveDays = user.getConsecutiveCommitDays();
-		LocalDate lastCommitDateAppliedDate = user.getLastCommitDateAppliedDate();
+		int bonusExp = calculateWindowBonusExp(commits, user);
 
-		if (lastCommitDateAppliedDate == null || currentConsecutiveDays == 0) {
-			int newConsecutiveDays = 0;
-			LocalDate checkDate = recentCommitDay;
-
-			while (commitDateSet.contains(checkDate)) {
-				newConsecutiveDays++;
-				checkDate = checkDate.minusDays(1);
-			}
-			user.updateLastCommitDateAppliedDate(recentCommitDay);
-			return newConsecutiveDays;
-		}
-
-		if (recentCommitDay.isEqual(lastCommitDateAppliedDate)) {
-			return currentConsecutiveDays;
-		}
-
-		if (recentCommitDay.isEqual(lastCommitDateAppliedDate.plusDays(1))) {
-			user.updateLastCommitDateAppliedDate(recentCommitDay);
-			return currentConsecutiveDays + 1;
-		}
-
-		int newConsecutiveDays = 0;
-		LocalDate checkDate = recentCommitDay;
-		while (commitDateSet.contains(checkDate)) {
-			newConsecutiveDays++;
-			checkDate = checkDate.minusDays(1);
-		}
-		user.updateLastCommitDateAppliedDate(recentCommitDay);
-		return newConsecutiveDays;
+		return baseExp + bonusExp;
 	}
 
-	private int calculateBaseExp(List<Commit> uncalculatedCommits) {
-		int commitCounts = uncalculatedCommits.stream()
-			.mapToInt(Commit::uncalculatedDelta)
-			.sum();
+	private int calculateWindowBonusExp(List<Commit> commits, User user) {
+		List<LocalDate> sortedDates = commits.stream()
+			.map(c -> c.getCommitDate().toLocalDate())
+			.distinct()
+			.sorted()
+			.toList();
 
-		return commitCounts * POINT_PER_COMMIT;
-	}
-
-	private int calculateTodayBonusExp(List<Commit> uncalculatedCommits, Set<LocalDate> commitDateSet) {
 		int totalBonus = 0;
+		int currentConsecutiveDays = 0;
+		LocalDate lastDate = null;
 
-		for (Commit commit : uncalculatedCommits) {
-			if (commit.isBonusAwarded()) {
-				continue;
+		for (LocalDate date : sortedDates) {
+			if (lastDate == null) {
+				currentConsecutiveDays = getInitialConsecutiveDaysForWindow(date, user);
+			} else if (date.equals(lastDate.plusDays(1))) {
+				currentConsecutiveDays++;
+			} else {
+				currentConsecutiveDays = 1;
 			}
-
-			LocalDate commitDate = commit.getCommitDate().toLocalDate();
-
-			int currentConsecutiveDays = getConsecutiveDaysForDate(commitDate, commitDateSet);
 
 			int dailyBonus = DAILY_BONUS_EXP + (BONUS_EXP_INCREASE * (currentConsecutiveDays - 1));
 			totalBonus += dailyBonus;
 
-			commit.todayBonusAwarded();
+			lastDate = date;
 		}
 
 		return totalBonus;
 	}
 
-	private int getConsecutiveDaysForDate(LocalDate targetDate, Set<LocalDate> commitDateSet) {
-		int consecutiveDays = 1;
-		LocalDate checkDate = targetDate.minusDays(1);
+	//월 시작일이 연속 커밋이 진행중인지 아닌지 판단
+	private int getInitialConsecutiveDaysForWindow(LocalDate windowStartDate, User user) {
+		LocalDate yesterday = windowStartDate.minusDays(1);
 
-		while (commitDateSet.contains(checkDate)) {
+		if (!commitRepository.existsByUserAndCommitDate(user, yesterday.atStartOfDay())) {
+			return 1;
+		}
+
+		int consecutiveDays = 1;
+		LocalDate checkDate = yesterday.minusDays(1);
+
+		while (commitRepository.existsByUserAndCommitDate(user, checkDate.atStartOfDay())) {
+			consecutiveDays++;
+			checkDate = checkDate.minusDays(1);
+		}
+
+		return consecutiveDays + 1;
+	}
+
+	private int calculateCurrentConsecutiveDays(User user) {
+		LocalDate today = LocalDate.now();
+
+		if (commitRepository.existsByUserAndCommitDate(user, today.atStartOfDay())) {
+			return countConsecutiveDaysFrom(user, today);
+		}
+
+		LocalDate yesterday = today.minusDays(1);
+		if (commitRepository.existsByUserAndCommitDate(user, yesterday.atStartOfDay())) {
+			return countConsecutiveDaysFrom(user, yesterday);
+		}
+
+		return 0;
+	}
+
+	private int countConsecutiveDaysFrom(User user, LocalDate startDate) {
+		int consecutiveDays = 0;
+		LocalDate checkDate = startDate;
+
+		while (commitRepository.existsByUserAndCommitDate(user, checkDate.atStartOfDay())) {
 			consecutiveDays++;
 			checkDate = checkDate.minusDays(1);
 		}
@@ -159,28 +191,12 @@ public class ExpService {
 		return consecutiveDays;
 	}
 
-	private int todayCommitCount(User user) {
-		LocalDateTime today = LocalDate.now().atStartOfDay();
-		return commitRepository.findAllByUserAndCommitDate(user, today).stream()
-			.mapToInt(Commit::getCnt)
-			.sum();
-	}
-
-	private int totalCommitCount(User user, List<Commit> newCommits) {
-		int newCount = newCommits.stream().mapToInt(Commit::uncalculatedDelta).sum();
-		return user.getTotalCommitCount() + newCount;
-	}
-
-	private void markCalculated(List<Commit> uncalculatedCommits) {
-		uncalculatedCommits.forEach(Commit::markAsCalculated);
-	}
-
 	private Tier determineTier(Integer exp) {
 		return tierRepository.findAll()
 			.stream()
 			.filter(tier -> tier.isValid(exp))
 			.max(Comparator.comparing(Tier::getRequiredExp))
-			.orElseThrow(() -> new ApiException(_TIER_NOT_FOUND));
+			.orElseThrow(() -> new ApiException(ErrorStatus._TIER_NOT_FOUND));
 	}
 
 	public ExpAndTierResponse updateExpAndTier(int exp) {

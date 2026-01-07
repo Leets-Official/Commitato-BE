@@ -63,11 +63,24 @@ public class User extends BaseTimeEntity {
 	@JoinColumn(name = "tier_id")
 	private Tier tier;
 
-	@Column
-	private LocalDateTime lastCommitUpdateTime;
+	@Column(name = "current-update-exp", nullable = false)
+	@Builder.Default
+	private Integer currentUpdateExp = 0;
+
+	@Column(name = "current-update-commit-count", nullable = false)
+	@Builder.Default
+	private Integer currentUpdateCommitCount = 0;
+
+	@Column(name = "last-two-month-exp", nullable = false)
+	@Builder.Default
+	private Integer lastTwoMonthExp = 0;
+
+	@Column(name = "last-two-month-commit-count", nullable = false)
+	@Builder.Default
+	private Integer lastTwoMonthCommitCount = 0;
 
 	@Column
-	private LocalDate lastCommitDateAppliedDate;
+	private LocalDateTime lastCommitUpdateTime;
 
 	@Column
 	private LocalDateTime lastLoginAt;
@@ -100,12 +113,16 @@ public class User extends BaseTimeEntity {
 		this.ranking = ranking;
 	}
 
-	public void updateLastCommitUpdateTime(LocalDateTime lastCommitUpdateTime) {
-		this.lastCommitUpdateTime = lastCommitUpdateTime;
+	public void updateCalcStats(int currentUpdateExp, int currentUpdateCommitCount,
+		int lastTwoMonthExp, int lastTwoMonthCommitCount) {
+		this.currentUpdateExp = currentUpdateExp;
+		this.currentUpdateCommitCount = currentUpdateCommitCount;
+		this.lastTwoMonthExp = lastTwoMonthExp;
+		this.lastTwoMonthCommitCount = lastTwoMonthCommitCount;
 	}
 
-	public void updateLastCommitDateAppliedDate(LocalDate lastCommitDateAppliedDate) {
-		this.lastCommitDateAppliedDate = lastCommitDateAppliedDate;
+	public void updateLastCommitUpdateTime(LocalDateTime lastCommitUpdateTime) {
+		this.lastCommitUpdateTime = lastCommitUpdateTime;
 	}
 
 	public void updateLastLoginAt(LocalDateTime loginAt) {
@@ -116,7 +133,7 @@ public class User extends BaseTimeEntity {
 		this.isHumanAccount = true;
 	}
 
-	public void reactivateAccount(){
+	public void reactivateAccount() {
 		this.isHumanAccount = false;
 	}
 }

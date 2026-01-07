@@ -1,13 +1,12 @@
 package com.leets.commitatobe.domain.commit.service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -34,11 +33,12 @@ public class CommitUpdateService {
 	private final GithubTokenService githubTokenService;
 	private final GitHubService gitHubService;
 
-
 	@Transactional
 	public void updateAndCalculate(UUID userId, Map<LocalDateTime, Integer> commitsByDate) {
 		User user = userRepository.getReferenceById(userId);
-		saveCommits(user, commitsByDate);
+
+		LocalDateTime since = LocalDate.now().minusMonths(2).withDayOfMonth(1).atStartOfDay();
+		saveCommits(user, commitsByDate, since);
 		expService.calculateExpAndTier(user.getGithubId());
 	}
 
@@ -51,7 +51,8 @@ public class CommitUpdateService {
 	@Transactional(propagation = Propagation.REQUIRES_NEW)
 	public void schedulerUpdateUserCommit(UUID userId) {
 		User user = userRepository.findById(userId).orElse(null);
-		if (user == null) return;
+		if (user == null)
+			return;
 
 		String accessToken = githubTokenService.getDecryptedAccessToken(user.getGithubId())
 			.orElseThrow(() -> new ApiException(ErrorStatus._UNAUTHORIZED));
@@ -77,37 +78,48 @@ public class CommitUpdateService {
 
 		Map<LocalDateTime, Integer> commitsByDate = new ConcurrentHashMap<>();
 
-		// GitHub API 호출 (여전히 네트워크 I/O지만, 상위에서 유저별로 병렬 실행 중)
 		gitHubService.fetchRepos(accessToken)
 			.forEach(name ->
 				gitHubService.countCommits(accessToken, name, user.getGithubId(), since, commitsByDate));
 
-		saveCommits(user, commitsByDate);
+		saveCommits(user, commitsByDate, since);
 
-		// EXP 계산 (이미 최적화됨)
 		expService.calculateExpAndTier(user.getGithubId());
 	}
 
-	private void saveCommits(User user, Map<LocalDateTime, Integer> commitsByDate) {
-		if (commitsByDate.isEmpty()) return;
-
-		List<LocalDateTime> dates = new ArrayList<>(commitsByDate.keySet());
-		List<Commit> existingCommits = commitRepository.findAllByUserAndCommitDateIn(user, dates);
-
-		Map<LocalDateTime, Commit> commitMap = existingCommits.stream()
-			.collect(Collectors.toMap(Commit::getCommitDate, Function.identity()));
+	private void saveCommits(User user, Map<LocalDateTime, Integer> commitsByDate, LocalDateTime since) {
+		List<Commit> existingCommits = commitRepository.findAllByUserAndCommitDateAfter(user, since.minusSeconds(1));
 
 		List<Commit> toSave = new ArrayList<>();
+		List<Commit> toDelete = new ArrayList<>();
 
-		commitsByDate.forEach((date, newCnt) -> {
-			if (newCnt <= 0) return;
-			LocalDateTime day = date.toLocalDate().atStartOfDay();
+		for (Commit commit : existingCommits) {
+			LocalDateTime date = commit.getCommitDate();
 
-			Commit commit = commitMap.getOrDefault(day, Commit.create(day, 0, user));
-			commit.addCnt(newCnt);
-			toSave.add(commit);
+			if (commitsByDate.containsKey(date)) {
+				int newCnt = commitsByDate.get(date);
+				commit.updateCnt(newCnt);
+				commitsByDate.remove(date);
+			} else {
+				commit.updateCnt(0);
+			}
+
+			if (commit.getCnt() <= 0) {
+				toDelete.add(commit);
+			} else {
+				toSave.add(commit);
+			}
+		}
+
+		commitsByDate.forEach((date, cnt) -> {
+			if (cnt > 0) {
+				toSave.add(Commit.create(date, cnt, user));
+			}
 		});
 
+		if (!toDelete.isEmpty()) {
+			commitRepository.deleteAll(toDelete);
+		}
 		commitRepository.saveAll(toSave);
 	}
 }

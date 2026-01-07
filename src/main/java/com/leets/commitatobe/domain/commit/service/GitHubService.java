@@ -91,6 +91,9 @@ public class GitHubService {
 				}
 
 				LocalDateTime commitDate = LocalDate.parse(commitDateTime.substring(0, 10), formatter).atStartOfDay();
+				if (commitDate.isBefore(date)) {
+					continue;
+				}
 				commitsByDate.merge(commitDate, 1, Integer::sum);
 			}
 

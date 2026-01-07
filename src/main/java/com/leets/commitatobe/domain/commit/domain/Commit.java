@@ -42,17 +42,6 @@ public class Commit extends BaseTimeEntity {
 	@JsonBackReference
 	private User user;
 
-	@Column(name = "is_calculated")
-	private boolean calculated;//경험치 계산 여부를 나타낸다.
-
-	@Column(name = "calculated_count", nullable = false)
-	@Builder.Default
-	private Integer calculatedCount = 0;
-
-	@Column(name = "bonus_awarded", nullable = false)
-	@Builder.Default
-	private boolean bonusAwarded = false;
-
 	public static Commit create(LocalDateTime commitDate, Integer cnt, User user) {
 		return Commit.builder()
 			.commitDate(commitDate)
@@ -61,22 +50,7 @@ public class Commit extends BaseTimeEntity {
 			.build();
 	}
 
-	public void addCnt(int newCount) {
-		if (newCount <= 0) return;
-		this.cnt += newCount;
-		this.calculated = false; // 다시 계산 필요(단, delta만 계산할 거라 안전)
-	}
-
-	public int uncalculatedDelta() {
-		return Math.max(0, this.cnt - this.calculatedCount);
-	}
-
-	public void markAsCalculated() {
-		this.calculatedCount = this.cnt;
-		this.calculated = true;
-	}
-
-	public void todayBonusAwarded() {
-		this.bonusAwarded = true;
+	public void updateCnt(Integer newCnt) {
+		this.cnt = newCnt;
 	}
 }
