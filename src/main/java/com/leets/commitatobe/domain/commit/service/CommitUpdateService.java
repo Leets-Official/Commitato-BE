@@ -70,11 +70,7 @@ public class CommitUpdateService {
 	}
 
 	private void schedulerCommitUpdate(User user, String accessToken) {
-		LocalDateTime time = user.getLastCommitUpdateTime();
-		if (time == null) {
-			time = user.getCreatedAt().toLocalDate().atStartOfDay();
-		}
-		LocalDateTime since = time;
+		LocalDateTime since = LocalDate.now().minusMonths(2).withDayOfMonth(1).atStartOfDay();
 
 		Map<LocalDateTime, Integer> commitsByDate = new ConcurrentHashMap<>();
 
