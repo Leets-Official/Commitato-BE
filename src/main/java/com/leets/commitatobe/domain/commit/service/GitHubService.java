@@ -10,7 +10,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
+import java.util.stream.IntStream;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -26,11 +30,13 @@ import com.leets.commitatobe.global.response.code.status.ErrorStatus;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
 
 @Service
 @RequiredArgsConstructor
 @Getter
+@Slf4j
 public class GitHubService {
 	private final String GITHUB_API_URL = "https://api.github.com";
 	private final WebClient webClient = WebClient.builder()
@@ -82,43 +88,119 @@ public class GitHubService {
 		).join();
 	}
 
-	// commit을 일별로 정리
+	// commit을 일별로 정리 (페이지네이션 병렬 처리)
 	public void countCommits(String accessToken, String fullName, String gitHubUsername, LocalDateTime date,
 		Map<LocalDateTime, Integer> commitsByDate) {
-		int page = 1;
 		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
+		// 첫 페이지 조회로 커밋 존재 여부 확인
+		JsonArray firstPageCommits;
+		try {
+			firstPageCommits = fetchCommitPage(accessToken, fullName, gitHubUsername, date, 1);
+		} catch (Exception e) {
+			return;
+		}
+
+		if (firstPageCommits == null || firstPageCommits.isEmpty()) {
+			return;
+		}
+
+		// 첫 페이지 데이터 처리
+		processCommits(firstPageCommits, date, commitsByDate, formatter);
+
+		// 첫 페이지가 100개 미만이면 더 이상 페이지가 없음
+		if (firstPageCommits.size() < 100) {
+			return;
+		}
+
+		// 페이지 2부터 배치 단위로 병렬 조회
+		int currentBatch = 0;  // 0부터 시작으로 수정
+		int batchSize = 5; // 5페이지씩 병렬 조회
+		int totalPages = 1;
+
 		while (true) {
-			JsonArray commits;
+			int batchStart = currentBatch * batchSize + 2;  // +2로 수정 (페이지 1은 이미 처리)
+			int batchEnd = batchStart + batchSize - 1;
 
-			try {
-				commits = getConnection(
-					"/repos/" + fullName + "/commits?page=" + page + "&per_page=100" + "&since=" + formatToISO8601(
-						date) + "&author=" + gitHubUsername, accessToken);
-			} catch (Exception e) {
-				return;
-			}
+			// 배치 내의 모든 페이지를 병렬로 조회
+			List<CompletableFuture<JsonArray>> futures = IntStream.rangeClosed(batchStart, batchEnd)
+				.mapToObj(pageNum -> CompletableFuture.supplyAsync(() -> {
+					try {
+						return fetchCommitPage(accessToken, fullName, gitHubUsername, date, pageNum);
+					} catch (Exception e) {
+						return null;
+					}
+				}, pageExecutor))
+				.toList();
 
-			if (commits == null || commits.isEmpty()) {
-				return;
-			}
+			// 모든 페이지 조회 완료 대기
+			List<JsonArray> results = futures.stream()
+				.map(CompletableFuture::join)
+				.toList();
 
-			for (int i = 0; i < commits.size(); i++) {
-				JsonObject commit = commits.get(i).getAsJsonObject();
-
-				String commitDateTime = getCommitDateTime(commit);
-				if (commitDateTime.length() < 10) {
-					continue;
+			// 결과 처리 (순서대로 처리하며 조기 종료)
+			boolean hasMorePages = false;
+			for (JsonArray commits : results) {
+				if (commits == null || commits.isEmpty()) {
+					// 빈 페이지 발견 시 종료
+					break;
 				}
 
-				LocalDateTime commitDate = LocalDate.parse(commitDateTime.substring(0, 10), formatter).atStartOfDay();
-				if (commitDate.isBefore(date)) {
-					continue;
+				processCommits(commits, date, commitsByDate, formatter);
+				totalPages++;
+
+				if (commits.size() == 100) {
+					// 100개면 다음 페이지가 있을 가능성 있음
+					hasMorePages = true;
+				} else {
+					// 100개 미만이면 마지막 페이지이므로 종료
+					hasMorePages = false;
+					break;
 				}
-				commitsByDate.merge(commitDate, 1, Integer::sum);
 			}
 
-			page++;
+			// 더 이상 페이지가 없으면 종료
+			if (!hasMorePages) {
+				break;
+			}
+
+			currentBatch++;
+
+			// 안전장치: 최대 100페이지 (10,000개 커밋)까지만 조회
+			if (totalPages >= 100) {
+				log.warn("레포지토리 {}의 커밋이 100페이지(10,000개)를 초과하여 조회를 중단합니다.", fullName);
+				break;
+			}
+		}
+	}
+
+	// 페이지 병렬 조회용 ExecutorService (5개 스레드)
+	private final ExecutorService pageExecutor = Executors.newFixedThreadPool(5);
+
+	// 단일 페이지의 커밋 조회
+	private JsonArray fetchCommitPage(String accessToken, String fullName, String gitHubUsername,
+		LocalDateTime date, int page) {
+		return getConnection(
+			"/repos/" + fullName + "/commits?page=" + page + "&per_page=100&since=" + formatToISO8601(date)
+				+ "&author=" + gitHubUsername, accessToken);
+	}
+
+	// 커밋 데이터 처리
+	private void processCommits(JsonArray commits, LocalDateTime date, Map<LocalDateTime, Integer> commitsByDate,
+		DateTimeFormatter formatter) {
+		for (int i = 0; i < commits.size(); i++) {
+			JsonObject commit = commits.get(i).getAsJsonObject();
+
+			String commitDateTime = getCommitDateTime(commit);
+			if (commitDateTime.length() < 10) {
+				continue;
+			}
+
+			LocalDateTime commitDate = LocalDate.parse(commitDateTime.substring(0, 10), formatter).atStartOfDay();
+			if (commitDate.isBefore(date)) {
+				continue;
+			}
+			commitsByDate.merge(commitDate, 1, Integer::sum);
 		}
 	}
 
