@@ -45,6 +45,7 @@ public class GitHubService {
 	// GitHub repository 이름 저장
 	public List<String> fetchRepos(String accessToken) {
 		Set<String> repoFullNames = new HashSet<>();
+		LocalDateTime twoMonthsAgo = LocalDate.now().minusMonths(2).withDayOfMonth(1).atStartOfDay();
 
 		JsonArray repos = getConnection("/user/repos?type=all&sort=pushed&per_page=100", accessToken);
 		if (repos == null) {
@@ -52,8 +53,28 @@ public class GitHubService {
 		}
 
 		repos.forEach(repo -> {
-			String fullName = repo.getAsJsonObject().get("full_name").getAsString();
-			repoFullNames.add(fullName);
+			JsonObject repoObject = repo.getAsJsonObject();
+			String fullName = repoObject.get("full_name").getAsString();
+
+			// pushed_at 필드로 최근 활동 확인
+			if (repoObject.has("pushed_at") && !repoObject.get("pushed_at").isJsonNull()) {
+				String pushedAtStr = repoObject.get("pushed_at").getAsString();
+				try {
+					Instant pushedAt = Instant.parse(pushedAtStr);
+					LocalDateTime pushedDate = LocalDateTime.ofInstant(pushedAt, ZoneId.of("Asia/Seoul"));
+
+					// 최근 2개월 이내에 push가 있었던 레포지토리만 추가
+					if (pushedDate.isAfter(twoMonthsAgo)) {
+						repoFullNames.add(fullName);
+					}
+				} catch (Exception e) {
+					// 날짜 파싱 실패 시 안전하게 포함
+					repoFullNames.add(fullName);
+				}
+			} else {
+				// pushed_at 정보가 없으면 안전하게 포함
+				repoFullNames.add(fullName);
+			}
 		});
 
 		return new ForkJoinPool(Runtime.getRuntime().availableProcessors()).submit(() ->
