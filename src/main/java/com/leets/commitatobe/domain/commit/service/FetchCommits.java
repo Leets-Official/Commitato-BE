@@ -61,10 +61,13 @@ public class FetchCommits {
 
 			commitUpdateService.updateAndCalculate(user.getId(), commitsByDate);
 
+			User updatedUser = userRepository.findByGithubId(gitHubId)
+				.orElseThrow(() -> new UsernameNotFoundException("해당하는 깃허브 닉네임과 일치하는 유저를 찾을 수 없음: " + gitHubId));
+
+			return CommitResponse.of(true, updatedUser);
+
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
-
-		return CommitResponse.of(true, user);
 	}
 }
