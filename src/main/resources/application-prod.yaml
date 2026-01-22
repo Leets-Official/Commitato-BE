@@ -27,6 +27,10 @@ spring:
         format_sql: false
         use_sql_comments: false
         show_sql: false
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
     defer-datasource-initialization: true
     open-in-view: false
 
