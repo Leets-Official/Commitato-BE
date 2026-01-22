@@ -6,7 +6,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -73,10 +76,24 @@ public class CommitUpdateService {
 		LocalDateTime since = LocalDate.now().minusMonths(2).withDayOfMonth(1).atStartOfDay();
 
 		Map<LocalDateTime, Integer> commitsByDate = new ConcurrentHashMap<>();
+		List<String> repos = gitHubService.fetchRepos(accessToken);
 
-		gitHubService.fetchRepos(accessToken)
-			.forEach(name ->
-				gitHubService.countCommits(accessToken, name, user.getGithubId(), since, commitsByDate));
+		ExecutorService executor = Executors.newFixedThreadPool(
+			Math.min(repos.size(), Runtime.getRuntime().availableProcessors())
+		);
+
+		List<CompletableFuture<Void>> futures = new ArrayList<>();
+
+		for (String fullName : repos) {
+			CompletableFuture<Void> future = CompletableFuture.runAsync(() ->
+				gitHubService.countCommits(accessToken, fullName, user.getGithubId(), since, commitsByDate), executor
+			);
+			futures.add(future);
+		}
+
+		CompletableFuture<Void> allFutures = CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
+		allFutures.join();
+		executor.shutdown();
 
 		saveCommits(user, commitsByDate, since);
 

@@ -30,7 +30,7 @@ public class DailyCommitScheduler {
 
 	private final ExecutorService executorService = Executors.newFixedThreadPool(10);
 
-	@Scheduled(cron = "0 04 13 * * *", zone = "Asia/Seoul")
+	@Scheduled(cron = "0 10 12 * * *", zone = "Asia/Seoul")
 	@RedissonLock(key = "'commit-update-scheduler'", leaseTime = 600L)
 	@LogExecutionTime
 	public void updateAllUsersCommits() {
