@@ -39,7 +39,7 @@ public class CommitUpdateService {
 
 		LocalDateTime since = LocalDate.now().minusMonths(2).withDayOfMonth(1).atStartOfDay();
 		saveCommits(user, commitsByDate, since);
-		expService.calculateExpAndTier(user.getGithubId());
+		expService.calculateExpAndTier(user);
 	}
 
 	@Transactional
@@ -80,7 +80,7 @@ public class CommitUpdateService {
 
 		saveCommits(user, commitsByDate, since);
 
-		expService.calculateExpAndTier(user.getGithubId());
+		expService.calculateExpAndTier(user);
 	}
 
 	private void saveCommits(User user, Map<LocalDateTime, Integer> commitsByDate, LocalDateTime since) {

@@ -7,7 +7,6 @@ import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
 import com.leets.commitatobe.domain.auth.service.AuthQueryService;
@@ -38,11 +37,8 @@ public class ExpService {
 	private static final int DAILY_BONUS_EXP = 100;
 	private static final int BONUS_EXP_INCREASE = 10;
 
-	@RedissonLock(key = "#githubId")
-	public void calculateExpAndTier(String githubId) {
-		User user = userRepository.findByGithubId(githubId)
-			.orElseThrow(() -> new UsernameNotFoundException("해당하는 깃허브 닉네임과 일치하는 유저를 찾을 수 없음: " + githubId));
-
+	@RedissonLock(key = "#user.githubId")
+	public void calculateExpAndTier(User user) {
 		LocalDateTime now = LocalDateTime.now();
 		LocalDateTime lastUpdate = user.getLastCommitUpdateTime();
 
