@@ -63,19 +63,19 @@ public class User extends BaseTimeEntity {
 	@JoinColumn(name = "tier_id")
 	private Tier tier;
 
-	@Column(name = "current-update-exp", nullable = false)
+	@Column(name = "current_update_exp", nullable = false)
 	@Builder.Default
 	private Integer currentUpdateExp = 0;
 
-	@Column(name = "current-update-commit-count", nullable = false)
+	@Column(name = "current_update_commit_count", nullable = false)
 	@Builder.Default
 	private Integer currentUpdateCommitCount = 0;
 
-	@Column(name = "last-two-month-exp", nullable = false)
+	@Column(name = "last_two_month_exp", nullable = false)
 	@Builder.Default
 	private Integer lastTwoMonthExp = 0;
 
-	@Column(name = "last-two-month-commit-count", nullable = false)
+	@Column(name = "last_two_month_commit_count", nullable = false)
 	@Builder.Default
 	private Integer lastTwoMonthCommitCount = 0;
 
