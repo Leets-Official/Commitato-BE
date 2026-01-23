@@ -19,8 +19,8 @@ import lombok.*;
 @Entity(name = "commit")
 @Getter
 @Builder
-@AllArgsConstructor(access = AccessLevel.PROTECTED)
-@NoArgsConstructor
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Commit extends BaseTimeEntity {
 
 	@Id
