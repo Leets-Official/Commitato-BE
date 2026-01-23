@@ -13,7 +13,6 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ForkJoinPool;
 import java.util.stream.IntStream;
 
 import org.springframework.http.HttpHeaders;
@@ -83,9 +82,7 @@ public class GitHubService {
 			}
 		});
 
-		return new ForkJoinPool(Runtime.getRuntime().availableProcessors()).submit(() ->
-			repoFullNames.parallelStream().toList()
-		).join();
+		return new ArrayList<>(repoFullNames);
 	}
 
 	// commit을 일별로 정리 (페이지네이션 병렬 처리)
