@@ -30,6 +30,8 @@ import com.leets.commitatobe.global.response.code.status.ErrorStatus;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
 
 @Service
@@ -94,7 +96,17 @@ public class GitHubService {
 		JsonArray firstPageCommits;
 		try {
 			firstPageCommits = fetchCommitPage(accessToken, fullName, gitHubUsername, date, 1);
+		} catch (ApiException e) {
+			log.warn("API 인증 오류로 커밋 조회 실패: {}", fullName);
+			return;
+		} catch (WebClientResponseException e) {
+			log.warn("HTTP 응답 오류로 커밋 조회 실패: {} - {} {}", e.getStatusCode(), fullName, e.getMessage());
+			return;
+		} catch (WebClientRequestException e) {
+			log.warn("네트워크 오류로 커밋 조회 실패: {} - {}", fullName, e.getMessage());
+			return;
 		} catch (Exception e) {
+			log.error("예상치 못한 예외로 커밋 조회 실패: {} - {}", fullName, e.getMessage(), e);
 			return;
 		}
 
@@ -124,7 +136,17 @@ public class GitHubService {
 				.mapToObj(pageNum -> CompletableFuture.supplyAsync(() -> {
 					try {
 						return fetchCommitPage(accessToken, fullName, gitHubUsername, date, pageNum);
+					} catch (ApiException e) {
+						log.warn("페이지 {} API 인증 오류: {}", pageNum, fullName);
+						return null;
+					} catch (org.springframework.web.reactive.function.client.WebClientResponseException e) {
+						log.warn("페이지 {} HTTP 응답 오류: {} - {}", pageNum, e.getStatusCode(), fullName);
+						return null;
+					} catch (org.springframework.web.reactive.function.client.WebClientRequestException e) {
+						log.warn("페이지 {} 네트워크 오류: {} - {}", pageNum, fullName, e.getMessage());
+						return null;
 					} catch (Exception e) {
+						log.error("페이지 {} 예상치 못한 예외: {} - {}", pageNum, fullName, e.getMessage(), e);
 						return null;
 					}
 				}, pageExecutor))
