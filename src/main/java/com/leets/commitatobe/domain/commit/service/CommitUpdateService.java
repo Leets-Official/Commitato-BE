@@ -11,6 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import com.leets.commitatobe.global.config.redis.annotation.RedissonLock;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -36,10 +37,9 @@ public class CommitUpdateService {
 	private final GithubTokenService githubTokenService;
 	private final GitHubService gitHubService;
 
+	@RedissonLock(key = "#user.githubId")
 	@Transactional
-	public void updateAndCalculate(UUID userId, Map<LocalDateTime, Integer> commitsByDate) {
-		User user = userRepository.getReferenceById(userId);
-
+	public void updateAndCalculate(User user, Map<LocalDateTime, Integer> commitsByDate) {
 		LocalDateTime since = LocalDate.now().minusMonths(2).withDayOfMonth(1).atStartOfDay();
 		saveCommits(user, commitsByDate, since);
 		expService.calculateExpAndTier(user);

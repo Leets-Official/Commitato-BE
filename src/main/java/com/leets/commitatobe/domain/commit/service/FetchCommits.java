@@ -59,7 +59,7 @@ public class FetchCommits {
 			allFutures.join();
 			executor.shutdown();
 
-			commitUpdateService.updateAndCalculate(user.getId(), commitsByDate);
+			commitUpdateService.updateAndCalculate(user, commitsByDate);
 
 			User updatedUser = userRepository.findByGithubId(gitHubId)
 				.orElseThrow(() -> new UsernameNotFoundException("해당하는 깃허브 닉네임과 일치하는 유저를 찾을 수 없음: " + gitHubId));

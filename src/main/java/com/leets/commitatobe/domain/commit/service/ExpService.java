@@ -37,7 +37,6 @@ public class ExpService {
 	private static final int DAILY_BONUS_EXP = 100;
 	private static final int BONUS_EXP_INCREASE = 10;
 
-	@RedissonLock(key = "#user.githubId")
 	public void calculateExpAndTier(User user) {
 		LocalDateTime now = LocalDateTime.now();
 		LocalDateTime lastUpdate = user.getLastCommitUpdateTime();
