@@ -19,7 +19,6 @@ import com.leets.commitatobe.domain.commit.repository.CommitRepository;
 import com.leets.commitatobe.domain.user.domain.User;
 import com.leets.commitatobe.domain.user.repository.UserRepository;
 import com.leets.commitatobe.domain.user.service.UserQueryService;
-import com.leets.commitatobe.global.executor.LogExecutionTime;
 
 import lombok.RequiredArgsConstructor;
 
@@ -33,7 +32,6 @@ public class FetchCommits {
 	private final CommitUpdateService commitUpdateService;
 	private final UserQueryService userQueryService;
 
-	@LogExecutionTime
 	public CommitResponse execute() {
 		String gitHubId = authQueryService.getGitHubId();
 		User user = userRepository.findByGithubId(gitHubId)

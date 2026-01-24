@@ -14,7 +14,6 @@ import com.leets.commitatobe.global.config.redis.annotation.RedissonLock;
 
 import com.leets.commitatobe.domain.user.domain.User;
 import com.leets.commitatobe.domain.user.repository.UserRepository;
-import com.leets.commitatobe.global.executor.LogExecutionTime;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,7 +31,6 @@ public class DailyCommitScheduler {
 
 	@Scheduled(cron = "0 10 12 * * *", zone = "Asia/Seoul")
 	@RedissonLock(key = "'commit-update-scheduler'", leaseTime = 600L)
-	@LogExecutionTime
 	public void updateAllUsersCommits() {
 		List<User> users = userRepository.findAllByIsHumanAccountFalse();
 		LocalDateTime afterHalfYear = LocalDateTime.now().minusMonths(SIX_MONTHS);
