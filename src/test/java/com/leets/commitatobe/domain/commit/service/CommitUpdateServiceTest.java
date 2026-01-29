@@ -3,7 +3,13 @@ package com.leets.commitatobe.domain.commit.service;
 import static org.assertj.core.api.Assertions.*;
 
 import java.lang.reflect.Field;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,7 +21,6 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.ContextConfiguration;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-import com.leets.commitatobe.domain.commit.domain.Commit;
 import com.leets.commitatobe.domain.commit.repository.CommitRepository;
 import com.leets.commitatobe.domain.tier.domain.Tier;
 import com.leets.commitatobe.domain.tier.repository.TierRepository;
@@ -27,10 +32,10 @@ import com.leets.commitatobe.global.config.TestContainerConfig;
 @Testcontainers
 @ActiveProfiles("test")
 @ContextConfiguration(classes = TestContainerConfig.class)
-class ExpServiceTest {
+class CommitUpdateServiceTest {
 
 	@Autowired
-	private ExpService expService;
+	private CommitUpdateService commitUpdateService;
 
 	@Autowired
 	private UserRepository userRepository;
@@ -72,13 +77,6 @@ class ExpServiceTest {
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
-
-		Commit commit1 = Commit.create(LocalDateTime.now().minusDays(2), 5, user);
-		Commit commit2 = Commit.create(LocalDateTime.now().minusDays(1), 10, user);
-		Commit commit3 = Commit.create(LocalDateTime.now(), 15, user);
-		commitRepository.save(commit1);
-		commitRepository.save(commit2);
-		commitRepository.save(commit3);
 	}
 
 	@AfterEach
@@ -89,16 +87,40 @@ class ExpServiceTest {
 	}
 
 	@Test
-	@DisplayName("경험치 계산 테스트")
-	void testExpCalculation() {
+	@DisplayName("커밋 업데이트 및 경험치 계산 동시성 테스트")
+	void testConcurrentUpdateAndCalculate() throws InterruptedException {
 
-		// When
-		expService.calculateExpAndTier(user);
+		// Given
+		LocalDate today = LocalDate.now();
+
+		int numberOfThreads = 10;
+		ExecutorService executorService = Executors.newFixedThreadPool(numberOfThreads);
+		CountDownLatch latch = new CountDownLatch(numberOfThreads);
+
+		// When - 각 스레드가 독립적인 commitsByDate 맵을 생성하여 사용
+		for (int i = 0; i < numberOfThreads; i++) {
+			executorService.submit(() -> {
+				try {
+					Map<LocalDateTime, Integer> commitsByDate = new ConcurrentHashMap<>();
+					commitsByDate.put(today.minusDays(2).atStartOfDay(), 5);
+					commitsByDate.put(today.minusDays(1).atStartOfDay(), 10);
+					commitsByDate.put(today.atStartOfDay(), 15);
+
+					User currentUser = userRepository.findByGithubId(user.getGithubId()).orElseThrow();
+					commitUpdateService.updateAndCalculate(currentUser, commitsByDate);
+				} finally {
+					latch.countDown();
+				}
+			});
+		}
+
+		latch.await();
+		executorService.shutdown();
 
 		// Then
 		User updatedUser = userRepository.findByGithubId(user.getGithubId()).orElseThrow();
 
-		// 경험치 계산
+		// 경험치 계산 - 락으로 인해 마지막 스레드의 결과만 반영됨
 		// commit1: 5*10 + 100 = 150
 		// commit2: 10*10 + 100 + 10 = 210
 		// commit3: 15*10 + 100 + 20 = 270
