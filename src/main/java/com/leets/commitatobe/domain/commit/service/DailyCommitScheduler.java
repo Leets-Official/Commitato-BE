@@ -1,89 +1,60 @@
 package com.leets.commitatobe.domain.commit.service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import com.leets.commitatobe.global.config.redis.annotation.RedissonLock;
-import org.springframework.transaction.annotation.Transactional;
 
-import com.leets.commitatobe.domain.auth.dto.GithubToken;
-import com.leets.commitatobe.domain.auth.service.GithubTokenService;
-import com.leets.commitatobe.domain.commit.domain.Commit;
-import com.leets.commitatobe.domain.commit.repository.CommitRepository;
+import com.leets.commitatobe.global.config.redis.annotation.RedissonLock;
+
 import com.leets.commitatobe.domain.user.domain.User;
 import com.leets.commitatobe.domain.user.repository.UserRepository;
-import com.leets.commitatobe.global.exception.ApiException;
-import com.leets.commitatobe.global.response.code.status.ErrorStatus;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class DailyCommitScheduler {
 	private static final long SIX_MONTHS = 6L;
 
 	private final UserRepository userRepository;
-	private final GitHubService gitHubService;
-	private final CommitRepository commitRepository;
-	private final ExpService expService;
-	private final GithubTokenService githubTokenService;
+	private final CommitUpdateService commitUpdateService;
 
-	@Scheduled(cron = "0 30 06 * * *")
-	@Transactional
+	private final ExecutorService executorService = Executors.newFixedThreadPool(10);
+
+	@Scheduled(cron = "0 10 12 * * *", zone = "Asia/Seoul")
 	@RedissonLock(key = "'commit-update-scheduler'", leaseTime = 600L)
 	public void updateAllUsersCommits() {
 		List<User> users = userRepository.findAllByIsHumanAccountFalse();
-
 		LocalDateTime afterHalfYear = LocalDateTime.now().minusMonths(SIX_MONTHS);
+
+		List<CompletableFuture<Void>> futures = new ArrayList<>();
 
 		for (User user : users) {
 			if (user.getLastLoginAt() != null && !user.getLastLoginAt().isAfter(afterHalfYear)) {
-				user.changeHumanAccount();
-				userRepository.save(user);
+				commitUpdateService.processHumanAccount(user.getId()); // 트랜잭션 분리
 				continue;
 			}
-			try {
-				tryCommitUpdate(user);
-			} catch (ApiException e) {
-				GithubToken newToken = githubTokenService.updateAccessTokenByRefreshToken(user.getGithubId());
-				gitHubService.updateToken(newToken.accessToken());
 
-				tryCommitUpdate(user);
-			}
-		}
-	}
-
-	private void tryCommitUpdate(User user) {
-		gitHubService.runWithoutRedirect(() -> {
-			String token = githubTokenService.getDecryptedAccessToken(user.getGithubId())
-				.orElseThrow(() -> new ApiException(ErrorStatus._UNAUTHORIZED));
-			gitHubService.updateToken(token);
-
-			LocalDateTime time = user.getLastCommitUpdateTime();
-			if (time == null) {
-				time = user.getCreatedAt().toLocalDate().atStartOfDay();
-			}
-
-			LocalDateTime since = time.minusHours(9);
-			gitHubService.fetchRepos(user.getGithubId())
-				.forEach(name ->
-					gitHubService.countCommits(name, user.getGithubId(), since));
-
-			gitHubService.getCommitsByDate().forEach((date, cnt) -> {
-					Commit commit = commitRepository
-						.findByCommitDateAndUser(date, user)
-						.orElse(Commit.create(date, 0, user));
-					commit.updateCnt(commit.getCnt() + cnt);
-					commitRepository.save(commit);
+			CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+				try {
+					commitUpdateService.schedulerUpdateUserCommit(user.getId());
+				} catch (Exception e) {
+					log.error("유저 {} 커밋 업데이트 실패", user.getGithubId(), e);
 				}
-			);
+			}, executorService);
 
-			user.updateLastCommitUpdateTime(LocalDateTime.now());
-			userRepository.save(user);
+			futures.add(future);
+		}
 
-			expService.calculateAndSaveExp(user.getGithubId());
-		});
+		// 모든 작업이 끝날 때까지 대기
+		CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
 	}
 }

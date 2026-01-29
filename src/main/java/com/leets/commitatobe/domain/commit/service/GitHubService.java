@@ -1,28 +1,27 @@
 package com.leets.commitatobe.domain.commit.service;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.stream.IntStream;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.leets.commitatobe.global.exception.ApiException;
@@ -30,16 +29,17 @@ import com.leets.commitatobe.global.response.code.status.ErrorStatus;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
 
 @Service
 @RequiredArgsConstructor
 @Getter
+@Slf4j
 public class GitHubService {
 	private final String GITHUB_API_URL = "https://api.github.com";
-	private String AUTH_TOKEN;
-	private final Map<LocalDateTime, Integer> commitsByDate = new HashMap<>();
-	private static final ThreadLocal<Boolean> REDIRECT_ON_401 = ThreadLocal.withInitial(() -> true);
 	private final WebClient webClient = WebClient.builder()
 		.baseUrl(GITHUB_API_URL)
 		.defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED_VALUE)
@@ -49,144 +49,191 @@ public class GitHubService {
 			.build())
 		.build();
 
-	@Value("${server-uri}")
-	private String SERVER_URI;
-
 	// GitHub repository 이름 저장
-	public List<String> fetchRepos(String gitHubUsername) {
-		commitsByDate.clear();
-
+	public List<String> fetchRepos(String accessToken) {
 		Set<String> repoFullNames = new HashSet<>();
+		LocalDateTime twoMonthsAgo = LocalDate.now().minusMonths(2).withDayOfMonth(1).atStartOfDay();
 
-		JsonArray repos = getConnection("/user/repos?type=all&sort=pushed&per_page=100");
+		JsonArray repos = getConnection("/user/repos?type=all&sort=pushed&per_page=100", accessToken);
 		if (repos == null) {
 			return new ArrayList<>();
 		}
 
 		repos.forEach(repo -> {
-			String fullName = repo.getAsJsonObject().get("full_name").getAsString();
-			repoFullNames.add(fullName);
+			JsonObject repoObject = repo.getAsJsonObject();
+			String fullName = repoObject.get("full_name").getAsString();
+
+			// pushed_at 필드로 최근 활동 확인
+			if (repoObject.has("pushed_at") && !repoObject.get("pushed_at").isJsonNull()) {
+				String pushedAtStr = repoObject.get("pushed_at").getAsString();
+				try {
+					Instant pushedAt = Instant.parse(pushedAtStr);
+					LocalDateTime pushedDate = LocalDateTime.ofInstant(pushedAt, ZoneId.of("Asia/Seoul"));
+
+					// 최근 2개월 이내에 push가 있었던 레포지토리만 추가
+					if (pushedDate.isAfter(twoMonthsAgo)) {
+						repoFullNames.add(fullName);
+					}
+				} catch (Exception e) {
+					// 날짜 파싱 실패 시 안전하게 포함
+					repoFullNames.add(fullName);
+				}
+			} else {
+				// pushed_at 정보가 없으면 안전하게 포함
+				repoFullNames.add(fullName);
+			}
 		});
 
-		return new ForkJoinPool(Runtime.getRuntime().availableProcessors()).submit(() ->
-			repoFullNames.parallelStream()
-				.filter(fullName -> isContributor(fullName, gitHubUsername))
-				.toList()
-		).join();
+		return new ArrayList<>(repoFullNames);
 	}
 
-	// 자신이 해당 repository의 기여자 인지 확인
-	private boolean isContributor(String fullName, String gitHubUsername) {
-		if (fullName.contains(gitHubUsername)) {
-			return true;
-		}
-
-		JsonArray contributors = getConnection("/repos/" + fullName + "/contributors");
-
-		if (contributors == null) {
-			return false;
-		}
-
-		for (int i = 0; i < contributors.size(); i++) {
-			JsonObject contributor = contributors.get(i).getAsJsonObject();
-
-			if (contributor.has("login") && !contributor.get("login").isJsonNull()) {
-				String contributorLogin = contributor.get("login").getAsString();
-
-				if (contributorLogin.equals(gitHubUsername)) {
-					return true;
-				}
-			}
-		}
-		return false;
-	}
-
-	// commit을 일별로 정리
-	public void countCommits(String fullName, String gitHubUsername, LocalDateTime date) {
-		int page = 1;
+	// commit을 일별로 정리 (페이지네이션 병렬 처리)
+	public void countCommits(String accessToken, String fullName, String gitHubUsername, LocalDateTime date,
+		Map<LocalDateTime, Integer> commitsByDate) {
 		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
+		// 첫 페이지 조회로 커밋 존재 여부 확인
+		JsonArray firstPageCommits;
+		try {
+			firstPageCommits = fetchCommitPage(accessToken, fullName, gitHubUsername, date, 1);
+		} catch (ApiException e) {
+			log.warn("API 인증 오류로 커밋 조회 실패: {}", fullName);
+			return;
+		} catch (WebClientResponseException e) {
+			log.warn("HTTP 응답 오류로 커밋 조회 실패: {} - {} {}", e.getStatusCode(), fullName, e.getMessage());
+			return;
+		} catch (WebClientRequestException e) {
+			log.warn("네트워크 오류로 커밋 조회 실패: {} - {}", fullName, e.getMessage());
+			return;
+		} catch (Exception e) {
+			log.error("예상치 못한 예외로 커밋 조회 실패: {} - {}", fullName, e.getMessage(), e);
+			return;
+		}
+
+		if (firstPageCommits == null || firstPageCommits.isEmpty()) {
+			return;
+		}
+
+		// 첫 페이지 데이터 처리
+		processCommits(firstPageCommits, date, commitsByDate, formatter);
+
+		// 첫 페이지가 100개 미만이면 더 이상 페이지가 없음
+		if (firstPageCommits.size() < 100) {
+			return;
+		}
+
+		// 페이지 2부터 배치 단위로 병렬 조회
+		int currentBatch = 0;  // 0부터 시작으로 수정
+		int batchSize = 5; // 5페이지씩 병렬 조회
+		int totalPages = 1;
+
 		while (true) {
-			JsonArray commits;
+			int batchStart = currentBatch * batchSize + 2;  // +2로 수정 (페이지 1은 이미 처리)
+			int batchEnd = batchStart + batchSize - 1;
 
-			try {
-				commits = getConnection(
-					"/repos/" + fullName + "/commits?page=" + page + "&per_page=100" + "&since=" + formatToISO8601(
-						date));
-			} catch (Exception e) {
-				return;
+			// 배치 내의 모든 페이지를 병렬로 조회
+			List<CompletableFuture<JsonArray>> futures = IntStream.rangeClosed(batchStart, batchEnd)
+				.mapToObj(pageNum -> CompletableFuture.supplyAsync(() -> {
+					try {
+						return fetchCommitPage(accessToken, fullName, gitHubUsername, date, pageNum);
+					} catch (ApiException e) {
+						log.warn("페이지 {} API 인증 오류: {}", pageNum, fullName);
+						return null;
+					} catch (org.springframework.web.reactive.function.client.WebClientResponseException e) {
+						log.warn("페이지 {} HTTP 응답 오류: {} - {}", pageNum, e.getStatusCode(), fullName);
+						return null;
+					} catch (org.springframework.web.reactive.function.client.WebClientRequestException e) {
+						log.warn("페이지 {} 네트워크 오류: {} - {}", pageNum, fullName, e.getMessage());
+						return null;
+					} catch (Exception e) {
+						log.error("페이지 {} 예상치 못한 예외: {} - {}", pageNum, fullName, e.getMessage(), e);
+						return null;
+					}
+				}, pageExecutor))
+				.toList();
+
+			// 모든 페이지 조회 완료 대기
+			List<JsonArray> results = futures.stream()
+				.map(CompletableFuture::join)
+				.toList();
+
+			// 결과 처리 (순서대로 처리하며 조기 종료)
+			boolean hasMorePages = false;
+			for (JsonArray commits : results) {
+				if (commits == null || commits.isEmpty()) {
+					// 빈 페이지 발견 시 종료
+					break;
+				}
+
+				processCommits(commits, date, commitsByDate, formatter);
+				totalPages++;
+
+				if (commits.size() == 100) {
+					// 100개면 다음 페이지가 있을 가능성 있음
+					hasMorePages = true;
+				} else {
+					// 100개 미만이면 마지막 페이지이므로 종료
+					hasMorePages = false;
+					break;
+				}
 			}
 
-			if (commits == null || commits.isEmpty()) {
-				return;
+			// 더 이상 페이지가 없으면 종료
+			if (!hasMorePages) {
+				break;
 			}
 
-			for (int i = 0; i < commits.size(); i++) {
-				JsonObject commit = commits.get(i).getAsJsonObject();
+			currentBatch++;
 
-				// validateAuthor 메서드가 false, 즉 author가 null일 경우 스킵
-				if (!validateAuthor(commit, gitHubUsername)) {
-					continue;
-				}
+			// 안전장치: 최대 100페이지 (10,000개 커밋)까지만 조회
+			if (totalPages >= 100) {
+				log.warn("레포지토리 {}의 커밋이 100페이지(10,000개)를 초과하여 조회를 중단합니다.", fullName);
+				break;
+			}
+		}
+	}
 
-				String commitDateTime = getCommitDateTime(commit);
-				if (commitDateTime.length() < 10) {
-					continue;
-				}
+	// 페이지 병렬 조회용 ExecutorService (5개 스레드)
+	private final ExecutorService pageExecutor = Executors.newFixedThreadPool(5);
 
-				int comparisonResult = commitDateTime.compareTo(formatToISO8601(date));
-				if (comparisonResult < 0) {
-					continue;
-				}
+	// 단일 페이지의 커밋 조회
+	private JsonArray fetchCommitPage(String accessToken, String fullName, String gitHubUsername,
+		LocalDateTime date, int page) {
+		return getConnection(
+			"/repos/" + fullName + "/commits?page=" + page + "&per_page=100&since=" + formatToISO8601(date)
+				+ "&author=" + gitHubUsername, accessToken);
+	}
 
-				LocalDateTime commitDate = LocalDate.parse(commitDateTime.substring(0, 10), formatter).atStartOfDay();
+	// 커밋 데이터 처리
+	private void processCommits(JsonArray commits, LocalDateTime date, Map<LocalDateTime, Integer> commitsByDate,
+		DateTimeFormatter formatter) {
+		for (int i = 0; i < commits.size(); i++) {
+			JsonObject commit = commits.get(i).getAsJsonObject();
 
-				synchronized (commitsByDate) {
-					commitsByDate.put(commitDate, commitsByDate.getOrDefault(commitDate, 0) + 1);
-				}
+			String commitDateTime = getCommitDateTime(commit);
+			if (commitDateTime.length() < 10) {
+				continue;
 			}
 
-			page++;
+			LocalDateTime commitDate = LocalDate.parse(commitDateTime.substring(0, 10), formatter).atStartOfDay();
+			if (commitDate.isBefore(date)) {
+				continue;
+			}
+			commitsByDate.merge(commitDate, 1, Integer::sum);
 		}
 	}
 
 	// http 연결
-	private JsonArray getConnection(String url) {
-		boolean redirect = REDIRECT_ON_401.get();
-
-		Mono<JsonArray> response = webClient.get()
+	private JsonArray getConnection(String url, String accessToken) {
+		return webClient.get()
 			.uri(url)
-			.header(HttpHeaders.AUTHORIZATION, "Bearer " + AUTH_TOKEN)
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
 			.retrieve()
-			.onStatus(status -> status == HttpStatus.UNAUTHORIZED, clientResponse ->
-				{
-					if (redirect) {
-						// AUTH_TOKEN이 유효하지 않으면 리다이렉트
-						return webClient.get()
-							.uri(SERVER_URI + "/login/github")
-							.retrieve()
-							.bodyToMono(Void.class)
-							.then(Mono.error(new ApiException(ErrorStatus._UNAUTHORIZED)));
-					} else {
-						return Mono.error(new ApiException(ErrorStatus._UNAUTHORIZED));
-					}
-				}
-			)
+			.onStatus(s -> s.value() == 401,
+				r -> Mono.error(new ApiException(ErrorStatus._UNAUTHORIZED)))
 			.bodyToMono(String.class)
-			.map(res -> JsonParser.parseString(res).getAsJsonArray());
-
-		return response.block();
-	}
-
-	private boolean validateAuthor(JsonObject commitJson, String gitHubUsername) {
-		if (commitJson.has("author") && !commitJson.get("author").isJsonNull()) {
-			JsonElement topAuthor = commitJson.getAsJsonObject("author").get("login");
-			if (topAuthor != null && !topAuthor.isJsonNull()) {
-				return topAuthor.getAsString().equals(gitHubUsername);
-			}
-		}
-		// author가 null이면 해당 커밋을 스킵
-		return false;
+			.map(res -> JsonParser.parseString(res).getAsJsonArray())
+			.block();
 	}
 
 	// commit 시간 추출
@@ -194,45 +241,17 @@ public class GitHubService {
 		String originCommitDateTime = commit.get("commit").getAsJsonObject() // UTC+0
 			.get("author").getAsJsonObject()
 			.get("date").getAsString();
+		Instant instant = Instant.parse(originCommitDateTime);
 
-		// 입력된 시간 문자열을 LocalDateTime으로 변환
-		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'");
-		LocalDateTime dateTime = LocalDateTime.parse(originCommitDateTime, formatter);
-
-		// 9시간 추가 -> UTC+9(한국 표준 시)
-		return dateTime.plusHours(9).format(formatter);
+		ZoneId kst = ZoneId.of("Asia/Seoul");
+		return instant.atZone(kst).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
 	}
 
 	// GitHub API에서 제공하는 시간 표현법으로 변환
 	private String formatToISO8601(LocalDateTime dateTime) {
-		ZonedDateTime zonedDateTime = dateTime.atZone(ZoneOffset.UTC);
-		return DateTimeFormatter.ISO_INSTANT.format(zonedDateTime);
-	}
+		ZoneId kst = ZoneId.of("Asia/Seoul");
+		Instant instant = dateTime.atZone(kst).toInstant();
 
-	// GitHub Access Token 저장
-	public void updateToken(String accessToken) {
-		this.AUTH_TOKEN = accessToken;
-	}
-
-	public <T> T runWithoutRedirect(java.util.concurrent.Callable<T> work) {
-		boolean prev = REDIRECT_ON_401.get();
-		REDIRECT_ON_401.set(false);
-		try {
-			return work.call();
-		} catch (Exception e) {
-			throw new RuntimeException(e);
-		} finally {
-			REDIRECT_ON_401.set(prev);
-		}
-	}
-
-	public void runWithoutRedirect(Runnable work) {
-		boolean prev = REDIRECT_ON_401.get();
-		REDIRECT_ON_401.set(false);
-		try {
-			work.run();
-		} finally {
-			REDIRECT_ON_401.set(prev);
-		}
+		return DateTimeFormatter.ISO_INSTANT.format(instant);
 	}
 }

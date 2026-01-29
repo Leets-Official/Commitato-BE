@@ -1,10 +1,12 @@
 package com.leets.commitatobe.domain.commit.service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -12,7 +14,6 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
 import com.leets.commitatobe.domain.auth.service.AuthQueryService;
-import com.leets.commitatobe.domain.commit.domain.Commit;
 import com.leets.commitatobe.domain.commit.dto.response.CommitResponse;
 import com.leets.commitatobe.domain.commit.repository.CommitRepository;
 import com.leets.commitatobe.domain.user.domain.User;
@@ -28,7 +29,7 @@ public class FetchCommits {
 	private final UserRepository userRepository;
 	private final GitHubService gitHubService; // GitHub API 통신
 	private final AuthQueryService authQueryService;
-	private final ExpService expService;
+	private final CommitUpdateService commitUpdateService;
 	private final UserQueryService userQueryService;
 
 	public CommitResponse execute() {
@@ -36,52 +37,35 @@ public class FetchCommits {
 		User user = userRepository.findByGithubId(gitHubId)
 			.orElseThrow(() -> new UsernameNotFoundException("해당하는 깃허브 닉네임과 일치하는 유저를 찾을 수 없음: " + gitHubId));
 
-		LocalDateTime dateTime = user.getLastCommitUpdateTime();
-
-		if (dateTime == null) {
-			dateTime = user.getCreatedAt().toLocalDate().atStartOfDay();
-		}
+		LocalDateTime since = LocalDate.now().minusMonths(2).withDayOfMonth(1).atStartOfDay();
 
 		try {
-			gitHubService.updateToken(userQueryService.getUserGitHubAccessToken(gitHubId));
+			String accessToken = userQueryService.getUserGitHubAccessToken(gitHubId);
+			List<String> repos = gitHubService.fetchRepos(accessToken);
 
-			List<String> repos = gitHubService.fetchRepos(gitHubId);
 			ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 			List<CompletableFuture<Void>> futures = new ArrayList<>();
-			LocalDateTime finalDateTime = dateTime.minusHours(9); //UTC와 KST 시간 차이를 맞추기 위함.
+			Map<LocalDateTime, Integer> commitsByDate = new ConcurrentHashMap<>();
 
 			for (String fullName : repos) {
-				CompletableFuture<Void> voidCompletableFuture = CompletableFuture.runAsync(() -> {
-					gitHubService.countCommits(fullName, gitHubId, finalDateTime);
-				}, executor);
-				futures.add(voidCompletableFuture);
+				CompletableFuture<Void> future = CompletableFuture.runAsync(() ->
+					gitHubService.countCommits(accessToken, fullName, gitHubId, since, commitsByDate), executor);
+				futures.add(future);
 			}
 
 			CompletableFuture<Void> allFutures = CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
 			allFutures.join();
-
 			executor.shutdown();
 
-			user.updateLastCommitUpdateTime(LocalDateTime.now());
+			commitUpdateService.updateAndCalculate(user, commitsByDate);
 
-			saveCommits(user);
+			User updatedUser = userRepository.findByGithubId(gitHubId)
+				.orElseThrow(() -> new UsernameNotFoundException("해당하는 깃허브 닉네임과 일치하는 유저를 찾을 수 없음: " + gitHubId));
 
-			expService.calculateAndSaveExp(gitHubId);//커밋 가져온 후 경험치 계산 및 저장
+			return CommitResponse.of(true, updatedUser);
 
 		} catch (Exception e) {
 			throw new RuntimeException(e);
-		}
-
-		return CommitResponse.of(true, user);
-	}
-
-	private void saveCommits(User user) {
-		// 날짜별 커밋 수 DB에 저장
-		for (Map.Entry<LocalDateTime, Integer> entry : gitHubService.getCommitsByDate().entrySet()) {
-			Commit commit = commitRepository.findByCommitDateAndUser(entry.getKey(), user)
-				.orElse(Commit.create(entry.getKey(), 0, user));
-			commit.updateCnt(entry.getValue() + commit.getCnt());
-			commitRepository.save(commit);
 		}
 	}
 }

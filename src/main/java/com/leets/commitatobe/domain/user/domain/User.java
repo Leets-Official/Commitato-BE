@@ -1,5 +1,6 @@
 package com.leets.commitatobe.domain.user.domain;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -62,6 +63,22 @@ public class User extends BaseTimeEntity {
 	@JoinColumn(name = "tier_id")
 	private Tier tier;
 
+	@Column(name = "current_update_exp", nullable = false)
+	@Builder.Default
+	private Integer currentUpdateExp = 0;
+
+	@Column(name = "current_update_commit_count", nullable = false)
+	@Builder.Default
+	private Integer currentUpdateCommitCount = 0;
+
+	@Column(name = "last_two_month_exp", nullable = false)
+	@Builder.Default
+	private Integer lastTwoMonthExp = 0;
+
+	@Column(name = "last_two_month_commit_count", nullable = false)
+	@Builder.Default
+	private Integer lastTwoMonthCommitCount = 0;
+
 	@Column
 	private LocalDateTime lastCommitUpdateTime;
 
@@ -96,6 +113,14 @@ public class User extends BaseTimeEntity {
 		this.ranking = ranking;
 	}
 
+	public void updateCalcStats(int currentUpdateExp, int currentUpdateCommitCount,
+		int lastTwoMonthExp, int lastTwoMonthCommitCount) {
+		this.currentUpdateExp = currentUpdateExp;
+		this.currentUpdateCommitCount = currentUpdateCommitCount;
+		this.lastTwoMonthExp = lastTwoMonthExp;
+		this.lastTwoMonthCommitCount = lastTwoMonthCommitCount;
+	}
+
 	public void updateLastCommitUpdateTime(LocalDateTime lastCommitUpdateTime) {
 		this.lastCommitUpdateTime = lastCommitUpdateTime;
 	}
@@ -108,7 +133,7 @@ public class User extends BaseTimeEntity {
 		this.isHumanAccount = true;
 	}
 
-	public void reactivateAccount(){
+	public void reactivateAccount() {
 		this.isHumanAccount = false;
 	}
 }
